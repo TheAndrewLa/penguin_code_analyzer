@@ -1,5 +1,6 @@
 <!DOCTYPE html>
 <html lang="en">
+
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
@@ -7,8 +8,12 @@
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/eclipse.min.css">
     <link rel="stylesheet" href="index.css">
-    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link
+        href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap"
+        rel="stylesheet">
 </head>
+
 <body>
     <div class="top-bar">
         <div class="logo-area">
@@ -16,8 +21,8 @@
             <div class="logo-sub">code analyzer</div>
         </div>
         <div class="top-actions">
-            <button class="secondary" id="saveBtn">Save</button>
-            <button class="secondary" id="shareBtn">Share</button>
+            <button class="secondary" id="saveBtn">Save<i class="fa-solid fa-download"></i></button>
+            <button class="secondary" id="shareBtn">Share<i class="fa-solid fa-share-nodes"></i></button>
         </div>
     </div>
 
@@ -38,7 +43,7 @@
                         <option>clang 17.0</option>
                     </select>
                 </div>
-                <button class="secondary" id="compileBtn">▶</button>
+                <button class="secondary" id="compileBtn"><i class="fa-solid fa-caret-right"></i></button>
             </div>
             <div class="editor-wrapper" id="editorWrapper">
             </div>
@@ -54,7 +59,7 @@
                     <button class="secondary" id="analyzeBtn">Analyze</button>
                     <button class="secondary" id="simulateBtn">Simulate</button>
                     <div class="zoom-controls">
-                        <button class="secondary zoom-btn" id="zoomOutBtn" title="Zoom out">−</button>
+                        <button class="secondary zoom-btn" id="zoomOutBtn" title="Zoom out">-</button>
                         <button class="secondary zoom-btn" id="zoomLevel">100%</button>
                         <button class="secondary zoom-btn" id="zoomInBtn" title="Zoom in">+</button>
                     </div>
@@ -84,4 +89,5 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/gas/gas.min.js"></script>
     <script src="index.js"></script>
 </body>
+
 </html>
