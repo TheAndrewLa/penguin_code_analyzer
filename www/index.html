@@ -4,7 +4,6 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
     <title>Penguin · Code Analyzer</title>
-    <!-- CodeMirror -->
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
     <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/eclipse.min.css">
     <link rel="stylesheet" href="index.css">
@@ -34,7 +33,7 @@
                     <div class="menu-item" data-type="binary">Binary (upload)</div>
                 </div>
                 <div class="toolbar-group">
-                    <select class="compiler-select" id="compilerSelect">
+                    <select id="compilerSelect">
                         <option>gcc 13.2</option>
                         <option>clang 17.0</option>
                     </select>
@@ -43,16 +42,14 @@
             </div>
             <div class="editor-wrapper" id="editorWrapper">
             </div>
-            <input type="file" id="fileInput" accept=".c,.cpp,.h,.s,.asm,.txt,.bin" style="display:none;">
+            <input type="file" id="fileInput" accept=".c,.cpp,.h,.s,.asm,.bin" style="display:none;">
         </div>
 
         <div class="right-panel">
             <div class="toolbar">
-                <div class="graph-title-group">
-                    <select id="functionSelect" class="function-select">
-                        <option selected>fib(int)</option>
-                    </select>
-                </div>
+                <select id="functionSelect" class="function-select">
+                    <option selected>fib(int)</option>
+                </select>
                 <div class="graph-actions">
                     <button class="secondary" id="analyzeBtn">Analyze</button>
                     <button class="secondary" id="simulateBtn">Simulate</button>

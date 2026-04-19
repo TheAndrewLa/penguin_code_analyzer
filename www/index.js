@@ -1,7 +1,6 @@
 $(function () {
   "use strict";
 
-  // ---------- Управление вкладками и редакторами ----------
   const $tabBar = $("#tabBar");
   const $editorWrapper = $("#editorWrapper");
   const $sourceMenu = $("#sourceMenu");
@@ -121,10 +120,10 @@ $(function () {
     });
 
     const activeTab = tabs.find((t) => t.id === id);
+
     if (activeTab) {
       activeTab.editor.getWrapperElement().style.display = "block";
       activeTab.$tab.addClass("active");
-      // Принудительно обновляем размер после показа
       setTimeout(() => {
         activeTab.editor.refresh();
         activeTab.editor.focus();
@@ -155,20 +154,18 @@ $(function () {
     updateTabsCloseButtons();
   }
 
-  // Инициализация: сначала создаём кнопку "+"
   const $addTabBtn = $("<div>", {
     class: "tab add-tab",
     id: "addTabBtn",
     text: "+",
   }).appendTo($tabBar);
 
-  // Создаём стартовую вкладку
   const initialTab = createTab("cpp", "main.cpp");
-  // Делаем её активной
+
   initialTab.$tab.addClass("active");
   initialTab.editor.getWrapperElement().style.display = "block";
   activeTabId = initialTab.id;
-  // Даём время на рендеринг
+
   setTimeout(() => {
     initialTab.editor.refresh();
     initialTab.editor.focus();
@@ -207,7 +204,6 @@ $(function () {
     }
   });
 
-  // ---------- CFG: данные и рисование ----------
   const $canvas = $("#cfgCanvas");
   const canvas = $canvas[0];
   const ctx = canvas.getContext("2d");
@@ -253,20 +249,24 @@ $(function () {
 
   const edges = [
     { from: "L1", to: "L4", conditional: true, taken: true },
-    { from: "L1", to: "L2", conditional: false },
+    { from: "L1", to: "L2", conditional: false, taken: false },
     { from: "L2", to: "L3", conditional: false },
     { from: "L3", to: "L3", conditional: true, taken: true },
-    { from: "L3", to: "L4", conditional: false },
+    { from: "L3", to: "L4", conditional: true, taken: false },
   ];
 
   let instructionHitRegions = [];
+
   let scale = 1.0;
-  let offsetX = 0,
-    offsetY = 0;
+
+  let offsetX = 0;
+  let offsetY = 0;
+
   let isPanning = false;
   let startPanX, startPanY;
 
   const $zoomLevel = $("#zoomLevel");
+
   function updateZoomDisplay() {
     $zoomLevel.text(Math.round(scale * 100) + "%");
   }
@@ -286,6 +286,7 @@ $(function () {
     const nodeWidth = 180;
 
     const outgoingMap = new Map();
+
     edges.forEach((edge) => {
       if (!outgoingMap.has(edge.from)) outgoingMap.set(edge.from, []);
       outgoingMap.get(edge.from).push(edge);
@@ -310,15 +311,13 @@ $(function () {
 
       const isConditional = edge.conditional || false;
       const isTaken = edge.taken || false;
-      const lineColor = isConditional
-        ? isTaken
-          ? "#2e7d32"
-          : "#000000"
-        : "#000000";
+
+      const conditionalColor = isTaken ? "#2e7d32" : "#992017";
+      const lineColor = isConditional ? conditionalColor : "#000000";
 
       ctx.beginPath();
       ctx.strokeStyle = lineColor;
-      ctx.lineWidth = 2.5 / scale;
+      ctx.lineWidth = 2;
 
       if (edge.from === edge.to) {
         const loopCenterX = fromNode.x + nodeWidth + 15;
@@ -363,7 +362,7 @@ $(function () {
 
       ctx.fillStyle = "#fefefe";
       ctx.strokeStyle = "#000000";
-      ctx.lineWidth = 3 / scale;
+      ctx.lineWidth = 2;
       ctx.fillRect(node.x, node.y, width, height);
       ctx.strokeRect(node.x, node.y, width, height);
 
@@ -391,7 +390,6 @@ $(function () {
     updateZoomDisplay();
   }
 
-  // ---------- Зум и панорамирование ----------
   $container.on("wheel", function (e) {
     e.preventDefault();
     const delta = e.originalEvent.deltaY > 0 ? 0.9 : 1.1;
@@ -434,6 +432,7 @@ $(function () {
     scale = Math.min(scale * 1.2, 3.0);
     drawGraph();
   });
+
   $("#zoomOutBtn").on("click", function () {
     scale = Math.max(scale / 1.2, 0.3);
     drawGraph();
@@ -446,7 +445,6 @@ $(function () {
     drawGraph();
   });
 
-  // ---------- Интерактивность (подсказки, модальное окно) ----------
   const $tooltip = $("#insnTooltip");
   const $modalOverlay = $("#modalOverlay");
   const $modalPre = $("#modalPre");
@@ -473,7 +471,7 @@ $(function () {
   }
 
   function getIntelSnippet(insn) {
-    return `; ${insn}\n; Intel® 64 and IA-32 Architectures Software Developer’s Manual\n; Vol. 2A 3-XXX\n; Opcode: ...\n; Description: ...\n; Flags affected: OF,SF,ZF,AF,PF,CF`;
+    return `${insn}\n Intel® 64 and IA-32 Architectures Software Developer’s Manual\n Vol. 2A 3-XXX\n Opcode: ...\n Description: ...\n Flags affected: OF,SF,ZF,AF,PF,CF`;
   }
 
   $canvas.on("mousemove", function (e) {
@@ -535,18 +533,17 @@ $(function () {
   $closeModalBtn.on("click", function () {
     $modalOverlay.css("visibility", "hidden");
   });
+
   $modalOverlay.on("click", function (e) {
     if (e.target === $modalOverlay[0])
       $modalOverlay.css("visibility", "hidden");
   });
 
-  // ---------- Селектор функции ----------
   $("#functionSelect").on("change", function () {
     console.log("Selected function:", $(this).val());
     drawGraph();
   });
 
-  // ---------- Кнопки действий ----------
   $("#compileBtn").on("click", drawGraph);
 
   $("#analyzeBtn").on("click", function () {
