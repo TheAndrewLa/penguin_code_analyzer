@@ -213,46 +213,51 @@ $(function () {
     {
       id: "L1",
       label: "L1",
-      x: 300,
-      y: 50,
-      instructions: ["test edi, edi", "jle L4"],
+      instructions: ["test edi, edi", "js L4"],
+      edgesOut: [
+        { to: "L2", conditional: true, taken: false },
+        { to: "L4", conditional: true, taken: true },
+      ],
     },
     {
       id: "L2",
       label: "L2",
-      x: 150,
-      y: 220,
-      instructions: ["mov eax, 1", "mov edx, 1", "cmp edi, 0"],
+      instructions: ["mov eax, 1", "mov edx, 1", "jmp L3"],
+      edgesOut: [{ to: "L3" }],
+    },
+    {
+      id: "L5",
+      label: "L5",
+      instructions: ["mov eax, ecx"],
+      edgesOut: [{ to: "L3", fallthrough: true }],
     },
     {
       id: "L3",
       label: "L3",
-      x: 450,
-      y: 220,
       instructions: [
         "sub edi, 1",
         "lea ecx, [rdx+rax]",
         "mov edx, eax",
-        "mov eax, ecx",
         "cmp edi, -1",
         "jne L3",
+      ],
+      edgesOut: [
+        { to: "L3", conditional: true, taken: true },
+        { to: "L6", conditional: true, taken: false },
       ],
     },
     {
       id: "L4",
       label: "L4",
-      x: 300,
-      y: 420,
-      instructions: ["mov eax, ecx", "ret"],
+      instructions: ["mov eax, 1", "ret"],
+      edgesOut: [],
     },
-  ];
-
-  const edges = [
-    { from: "L1", to: "L4", conditional: true, taken: true },
-    { from: "L1", to: "L2", conditional: false, taken: false },
-    { from: "L2", to: "L3", conditional: false },
-    { from: "L3", to: "L3", conditional: true, taken: true },
-    { from: "L3", to: "L4", conditional: true, taken: false },
+    {
+      id: "L6",
+      label: "L6",
+      instructions: ["mov eax, ecx", "ret"],
+      edgesOut: [],
+    },
   ];
 
   let instructionHitRegions = [];
@@ -283,106 +288,183 @@ $(function () {
     ctx.translate(offsetX, offsetY);
     ctx.scale(scale, scale);
 
-    const nodeWidth = 180;
+    // edges.forEach((edge) => {
+    //   if (!outgoingMap.has(edge.from)) outgoingMap.set(edge.from, []);
+    //   outgoingMap.get(edge.from).push(edge);
+    // });
 
-    const outgoingMap = new Map();
+    // edges.forEach((edge) => {
+    //   const fromNode = nodes.find((n) => n.id === edge.from);
+    //   const toNode = nodes.find((n) => n.id === edge.to);
+    //   if (!fromNode || !toNode) return;
 
-    edges.forEach((edge) => {
-      if (!outgoingMap.has(edge.from)) outgoingMap.set(edge.from, []);
-      outgoingMap.get(edge.from).push(edge);
-    });
+    //   const fromHeight = 30 + fromNode.instructions.length * 22;
+    //   const toHeight = 30 + toNode.instructions.length * 22;
 
-    edges.forEach((edge) => {
-      const fromNode = nodes.find((n) => n.id === edge.from);
-      const toNode = nodes.find((n) => n.id === edge.to);
-      if (!fromNode || !toNode) return;
+    //   const fromY = fromNode.y + fromHeight;
+    //   const toY = toNode.y;
 
-      const fromHeight = 30 + fromNode.instructions.length * 22;
-      const toHeight = 30 + toNode.instructions.length * 22;
+    //   const outgoing = outgoingMap.get(edge.from) || [edge];
+    //   const index = outgoing.indexOf(edge);
+    //   const step = nodeWidth / (outgoing.length + 1);
+    //   const startX = fromNode.x + step * (index + 1);
+    //   const endX = toNode.x + nodeWidth / 2;
 
-      const fromY = fromNode.y + fromHeight;
-      const toY = toNode.y;
+    //   const isConditional = edge.conditional || false;
+    //   const isTaken = edge.taken || false;
 
-      const outgoing = outgoingMap.get(edge.from) || [edge];
-      const index = outgoing.indexOf(edge);
-      const step = nodeWidth / (outgoing.length + 1);
-      const startX = fromNode.x + step * (index + 1);
-      const endX = toNode.x + nodeWidth / 2;
+    //   const conditionalColor = isTaken ? "#2e7d32" : "#992017";
+    //   const lineColor = isConditional ? conditionalColor : "#000000";
 
-      const isConditional = edge.conditional || false;
-      const isTaken = edge.taken || false;
+    //   ctx.beginPath();
+    //   ctx.strokeStyle = lineColor;
+    //   ctx.lineWidth = 2;
 
-      const conditionalColor = isTaken ? "#2e7d32" : "#992017";
-      const lineColor = isConditional ? conditionalColor : "#000000";
+    //   if (edge.from === edge.to) {
+    //     const loopCenterX = fromNode.x + nodeWidth + 15;
+    //     const loopCenterY = fromNode.y + fromHeight / 2;
+    //     const radiusX = 25;
+    //     const radiusY = 15;
 
-      ctx.beginPath();
-      ctx.strokeStyle = lineColor;
-      ctx.lineWidth = 2;
+    //     ctx.beginPath();
+    //     ctx.ellipse(
+    //       loopCenterX,
+    //       loopCenterY,
+    //       radiusX,
+    //       radiusY,
+    //       0,
+    //       0,
+    //       Math.PI * 2,
+    //     );
+    //     ctx.stroke();
+    //   } else {
+    //     const midY = (fromY + toY) / 2;
+    //     ctx.moveTo(startX, fromY);
+    //     ctx.lineTo(startX, midY);
+    //     ctx.lineTo(endX, midY);
+    //     ctx.lineTo(endX, toY);
+    //     ctx.stroke();
+    //   }
 
-      if (edge.from === edge.to) {
-        const loopCenterX = fromNode.x + nodeWidth + 15;
-        const loopCenterY = fromNode.y + fromHeight / 2;
-        const radiusX = 25;
-        const radiusY = 15;
-
-        ctx.beginPath();
-        ctx.ellipse(
-          loopCenterX,
-          loopCenterY,
-          radiusX,
-          radiusY,
-          0,
-          0,
-          Math.PI * 2,
-        );
-        ctx.stroke();
-      } else {
-        const midY = (fromY + toY) / 2;
-        ctx.moveTo(startX, fromY);
-        ctx.lineTo(startX, midY);
-        ctx.lineTo(endX, midY);
-        ctx.lineTo(endX, toY);
-        ctx.stroke();
-      }
-
-      if (!edge.conditional && edge.label) {
-        ctx.font = '12px "IBM Plex Mono"';
-        ctx.fillStyle = "#333";
-        const midX = (startX + endX) / 2;
-        const midY = (fromY + toY) / 2;
-        ctx.fillText(edge.label, midX - 15, midY - 5);
-      }
-    });
+    //   if (!edge.conditional && edge.label) {
+    //     ctx.font = '12px "IBM Plex Mono"';
+    //     ctx.fillStyle = "#333";
+    //     const midX = (startX + endX) / 2;
+    //     const midY = (fromY + toY) / 2;
+    //     ctx.fillText(edge.label, midX - 15, midY - 5);
+    //   }
+    // });
 
     instructionHitRegions = [];
 
-    nodes.forEach((node) => {
-      const width = 180;
-      const height = 30 + node.instructions.length * 22;
+    let nodesCoordinates = new Map();
 
-      ctx.fillStyle = "#fefefe";
+    let currentX = 50;
+    let currentY = 20;
+
+    nodes.forEach((node) => {
+      let width = 180;
+      const height = 50 + node.instructions.length * 22;
+
+      node.instructions.forEach((instr, idx) => {
+        const textWidth = ctx.measureText(instr).width;
+
+        if (textWidth >= width - 10) {
+          width = textWidth - 10;
+        }
+      });
+
+      ctx.fillStyle = "#ffffff";
       ctx.strokeStyle = "#000000";
-      ctx.lineWidth = 2;
-      ctx.fillRect(node.x, node.y, width, height);
-      ctx.strokeRect(node.x, node.y, width, height);
+      ctx.lineWidth = 1;
+
+      ctx.fillRect(currentX, currentY, width, height);
+      ctx.strokeRect(currentX, currentY, width, height);
 
       ctx.fillStyle = "#1e1e1e";
-      ctx.font = 'bold 13px "Inter"';
-      ctx.fillText(node.label, node.x + 10, node.y + 22);
+      ctx.font = 'bold 14px "IBM Plex Mono';
+
+      ctx.fillText(node.label, currentX + 10, currentY + 22);
 
       ctx.font = '13px "IBM Plex Mono"';
       ctx.fillStyle = "#333";
-      let yOffset = node.y + 48;
-      node.instructions.forEach((insn, idx) => {
-        ctx.fillText(insn, node.x + 12, yOffset);
-        const textWidth = ctx.measureText(insn).width;
+
+      let yOffset = currentY + 48;
+
+      node.instructions.forEach((instr, idx) => {
+        const textWidth = ctx.measureText(instr).width;
+
         instructionHitRegions.push({
           nodeId: node.id,
-          insnIndex: idx,
-          insnText: insn,
-          rect: { x: node.x + 10, y: yOffset - 16, w: textWidth + 8, h: 20 },
+          instrIndex: idx,
+          instrText: instr,
+          rect: { x: currentX + 10, y: yOffset - 16, w: textWidth + 8, h: 20 },
         });
+
+        ctx.fillText(instr, currentX + 12, yOffset);
         yOffset += 22;
+      });
+
+      nodesCoordinates.set(node.id, {
+        x: currentX,
+        y: currentY,
+        width: width,
+        height: height,
+      });
+
+      currentY += height;
+      currentY += 30;
+    });
+
+    let usedSpace = 10;
+
+    nodes.forEach((node) => {
+      const startCoords = nodesCoordinates.get(node.id);
+
+      node.edgesOut.forEach((edge) => {
+        const endCoords = nodesCoordinates.get(edge.to);
+
+        const isFall = edge.fallthrough || false;
+        const isConditional = edge.conditional || false;
+        const isTaken = edge.taken || false;
+
+        const conditionColor = isTaken ? "#2e7d32" : "#992017";
+        const lineColor = isConditional ? conditionColor : "#000000";
+
+        ctx.beginPath();
+        ctx.strokeStyle = lineColor;
+        ctx.lineWidth = 1;
+
+        ctx.moveTo(
+          startCoords.x + startCoords.width / 2,
+          startCoords.y + startCoords.height,
+        );
+
+        if (isFall) {
+          ctx.lineTo(endCoords.x + endCoords.width / 2, endCoords.y);
+        } else {
+          ctx.lineTo(
+            startCoords.x + startCoords.width / 2,
+            startCoords.y + startCoords.height + usedSpace / 3,
+          );
+          ctx.lineTo(
+            startCoords.x + startCoords.width + usedSpace + 10,
+            startCoords.y + startCoords.height + usedSpace / 3,
+          );
+          ctx.lineTo(
+            endCoords.x + endCoords.width + usedSpace + 10,
+            endCoords.y - usedSpace / 3,
+          );
+          ctx.lineTo(
+            endCoords.x + endCoords.width / 2,
+            endCoords.y - usedSpace / 3,
+          );
+          ctx.lineTo(endCoords.x + endCoords.width / 2, endCoords.y);
+
+          usedSpace += 10;
+        }
+
+        ctx.stroke();
       });
     });
 
@@ -496,8 +578,8 @@ $(function () {
       }
     }
     if (hit) {
-      const m = getMetrics(hit.insnText);
-      const content = `<strong>${hit.insnText}</strong><br>Latency: ${m.lat}<br>Throughput: ${m.tp}<br>uOps: ${m.uops}<br><span style="color:#666; font-size:11px;">Ctrl+Click — Intel manual</span>`;
+      const m = getMetrics(hit.instrText);
+      const content = `<strong>${hit.instrText}</strong><br>Latency: ${m.lat}<br>Throughput: ${m.tp}<br>uOps: ${m.uops}<br><span style="color:#666; font-size:11px;">Ctrl+Click — Intel manual</span>`;
       showTooltip(content, e.clientX, e.clientY);
     } else {
       hideTooltip();
@@ -522,7 +604,7 @@ $(function () {
         worldY >= r.y &&
         worldY <= r.y + r.h
       ) {
-        $modalPre.text(getIntelSnippet(region.insnText));
+        $modalPre.text(getIntelSnippet(region.instrText));
         $modalOverlay.css("visibility", "visible");
         e.preventDefault();
         break;
