@@ -1,0 +1,570 @@
+$(function () {
+  "use strict";
+
+  // ---------- Управление вкладками и редакторами ----------
+  const $tabBar = $("#tabBar");
+  const $editorWrapper = $("#editorWrapper");
+  const $sourceMenu = $("#sourceMenu");
+  const $fileInput = $("#fileInput");
+
+  let tabs = [];
+  let activeTabId = null;
+  let nextTabId = 1;
+
+  function updateTabsCloseButtons() {
+    tabs.forEach((tab) => {
+      const $close = tab.$tab.find(".tab-close");
+      if (tabs.length === 1) {
+        $close.hide();
+      } else {
+        $close.show();
+      }
+    });
+  }
+
+  function createTab(type, customName, initialContent) {
+    const id = nextTabId++;
+    let name = customName;
+    if (!name) {
+      if (type === "c") name = "main.c";
+      else if (type === "cpp") name = "main.cpp";
+      else if (type === "asm") name = "main.s";
+      else name = "source";
+    }
+
+    const $addBtn = $("#addTabBtn");
+    const $tab = $("<div>", {
+      class: "tab",
+      "data-id": id,
+    });
+    const $tabName = $("<span>").text(name).css("margin-right", "8px");
+    const $closeBtn = $("<span>", {
+      class: "tab-close",
+      html: "&times;",
+      title: "Close tab",
+    }).css({
+      cursor: "pointer",
+      fontWeight: "bold",
+      fontSize: "16px",
+      padding: "0 4px",
+    });
+    $tab.append($tabName, $closeBtn);
+    $tab.insertBefore($addBtn);
+
+    const $textarea = $("<textarea>", {
+      id: `editor-${id}`,
+      style: "display:none;",
+    }).appendTo($editorWrapper);
+
+    let mode = "text/x-c++src";
+    if (type === "c") mode = "text/x-csrc";
+    else if (type === "asm") mode = "gas";
+
+    const editor = CodeMirror.fromTextArea($textarea[0], {
+      lineNumbers: true,
+      mode: mode,
+      theme: "eclipse",
+      indentUnit: 4,
+      tabSize: 4,
+      viewportMargin: Infinity,
+      gutters: ["CodeMirror-linenumbers"],
+      matchBrackets: true,
+    });
+
+    if (initialContent) {
+      editor.setValue(initialContent);
+    } else {
+      if (type === "asm") {
+        editor.setValue(
+          `.globl fib\nfib:\n    test edi, edi\n    jle .L4\n    mov eax,1\n    mov edx,1\n.L3:\n    sub edi,1\n    lea ecx,[rdx+rax]\n    mov edx,eax\n    mov eax,ecx\n    cmp edi,-1\n    jne .L3\n.L4:\n    ret`,
+        );
+      } else {
+        editor.setValue(
+          `int fib(int n) {\n    int prev = 1, current = 1;\n    for (; n >= 0; --n) {\n        int tmp = prev + current;\n        prev = current;\n        current = tmp;\n    }\n    return current;\n}`,
+        );
+      }
+    }
+
+    editor.setSize("100%", "100%");
+
+    const tabInfo = {
+      id,
+      type,
+      name,
+      editor,
+      $tab,
+      $textarea,
+    };
+    tabs.push(tabInfo);
+
+    $tab.on("click", function (e) {
+      if ($(e.target).is(".tab-close")) return;
+      setActiveTab(id);
+    });
+
+    $closeBtn.on("click", function (e) {
+      e.stopPropagation();
+      closeTab(id);
+    });
+
+    updateTabsCloseButtons();
+
+    return tabInfo;
+  }
+
+  function setActiveTab(id) {
+    if (activeTabId === id) return;
+
+    tabs.forEach((tab) => {
+      tab.editor.getWrapperElement().style.display = "none";
+      tab.$tab.removeClass("active");
+    });
+
+    const activeTab = tabs.find((t) => t.id === id);
+    if (activeTab) {
+      activeTab.editor.getWrapperElement().style.display = "block";
+      activeTab.$tab.addClass("active");
+      // Принудительно обновляем размер после показа
+      setTimeout(() => {
+        activeTab.editor.refresh();
+        activeTab.editor.focus();
+      }, 20);
+      activeTabId = id;
+    }
+  }
+
+  function closeTab(id) {
+    const index = tabs.findIndex((t) => t.id === id);
+    if (index === -1) return;
+
+    if (tabs.length <= 1) {
+      alert("Cannot close the last tab.");
+      return;
+    }
+
+    const tab = tabs[index];
+    tab.$tab.remove();
+    tab.editor.getWrapperElement().remove();
+    tabs.splice(index, 1);
+
+    if (activeTabId === id) {
+      const newActive = tabs[Math.max(0, index - 1)];
+      setActiveTab(newActive.id);
+    }
+
+    updateTabsCloseButtons();
+  }
+
+  // Инициализация: сначала создаём кнопку "+"
+  const $addTabBtn = $("<div>", {
+    class: "tab add-tab",
+    id: "addTabBtn",
+    text: "+",
+  }).appendTo($tabBar);
+
+  // Создаём стартовую вкладку
+  const initialTab = createTab("cpp", "main.cpp");
+  // Делаем её активной
+  initialTab.$tab.addClass("active");
+  initialTab.editor.getWrapperElement().style.display = "block";
+  activeTabId = initialTab.id;
+  // Даём время на рендеринг
+  setTimeout(() => {
+    initialTab.editor.refresh();
+    initialTab.editor.focus();
+  }, 50);
+
+  $addTabBtn.on("click", function (e) {
+    e.stopPropagation();
+    $sourceMenu.toggle();
+  });
+
+  $(document).on("click", function () {
+    $sourceMenu.hide();
+  });
+
+  $sourceMenu.on("click", ".menu-item", function (e) {
+    const type = $(this).data("type");
+    $sourceMenu.hide();
+
+    if (type === "binary") {
+      $fileInput.trigger("click");
+      $fileInput.off("change").on("change", function (e) {
+        const file = e.target.files[0];
+        if (file) {
+          const tab = createTab(
+            "binary",
+            file.name,
+            `; Binary file: ${file.name}\n; Content not shown`,
+          );
+          setActiveTab(tab.id);
+        }
+        $fileInput.val("");
+      });
+    } else {
+      const tab = createTab(type);
+      setActiveTab(tab.id);
+    }
+  });
+
+  // ---------- CFG: данные и рисование ----------
+  const $canvas = $("#cfgCanvas");
+  const canvas = $canvas[0];
+  const ctx = canvas.getContext("2d");
+  const $container = $("#graphContainer");
+
+  const nodes = [
+    {
+      id: "L1",
+      label: "L1",
+      x: 300,
+      y: 50,
+      instructions: ["test edi, edi", "jle L4"],
+    },
+    {
+      id: "L2",
+      label: "L2",
+      x: 150,
+      y: 220,
+      instructions: ["mov eax, 1", "mov edx, 1", "cmp edi, 0"],
+    },
+    {
+      id: "L3",
+      label: "L3",
+      x: 450,
+      y: 220,
+      instructions: [
+        "sub edi, 1",
+        "lea ecx, [rdx+rax]",
+        "mov edx, eax",
+        "mov eax, ecx",
+        "cmp edi, -1",
+        "jne L3",
+      ],
+    },
+    {
+      id: "L4",
+      label: "L4",
+      x: 300,
+      y: 420,
+      instructions: ["mov eax, ecx", "ret"],
+    },
+  ];
+
+  const edges = [
+    { from: "L1", to: "L4", conditional: true, taken: true },
+    { from: "L1", to: "L2", conditional: false },
+    { from: "L2", to: "L3", conditional: false },
+    { from: "L3", to: "L3", conditional: true, taken: true },
+    { from: "L3", to: "L4", conditional: false },
+  ];
+
+  let instructionHitRegions = [];
+  let scale = 1.0;
+  let offsetX = 0,
+    offsetY = 0;
+  let isPanning = false;
+  let startPanX, startPanY;
+
+  const $zoomLevel = $("#zoomLevel");
+  function updateZoomDisplay() {
+    $zoomLevel.text(Math.round(scale * 100) + "%");
+  }
+
+  function drawGraph() {
+    const containerRect = $container[0].getBoundingClientRect();
+    canvas.width = containerRect.width;
+    canvas.height = containerRect.height;
+    $canvas.css({ width: containerRect.width, height: containerRect.height });
+
+    ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+    ctx.save();
+    ctx.translate(offsetX, offsetY);
+    ctx.scale(scale, scale);
+
+    const nodeWidth = 180;
+
+    const outgoingMap = new Map();
+    edges.forEach((edge) => {
+      if (!outgoingMap.has(edge.from)) outgoingMap.set(edge.from, []);
+      outgoingMap.get(edge.from).push(edge);
+    });
+
+    edges.forEach((edge) => {
+      const fromNode = nodes.find((n) => n.id === edge.from);
+      const toNode = nodes.find((n) => n.id === edge.to);
+      if (!fromNode || !toNode) return;
+
+      const fromHeight = 30 + fromNode.instructions.length * 22;
+      const toHeight = 30 + toNode.instructions.length * 22;
+
+      const fromY = fromNode.y + fromHeight;
+      const toY = toNode.y;
+
+      const outgoing = outgoingMap.get(edge.from) || [edge];
+      const index = outgoing.indexOf(edge);
+      const step = nodeWidth / (outgoing.length + 1);
+      const startX = fromNode.x + step * (index + 1);
+      const endX = toNode.x + nodeWidth / 2;
+
+      const isConditional = edge.conditional || false;
+      const isTaken = edge.taken || false;
+      const lineColor = isConditional
+        ? isTaken
+          ? "#2e7d32"
+          : "#000000"
+        : "#000000";
+
+      ctx.beginPath();
+      ctx.strokeStyle = lineColor;
+      ctx.lineWidth = 2.5 / scale;
+
+      if (edge.from === edge.to) {
+        const loopCenterX = fromNode.x + nodeWidth + 15;
+        const loopCenterY = fromNode.y + fromHeight / 2;
+        const radiusX = 25;
+        const radiusY = 15;
+
+        ctx.beginPath();
+        ctx.ellipse(
+          loopCenterX,
+          loopCenterY,
+          radiusX,
+          radiusY,
+          0,
+          0,
+          Math.PI * 2,
+        );
+        ctx.stroke();
+      } else {
+        const midY = (fromY + toY) / 2;
+        ctx.moveTo(startX, fromY);
+        ctx.lineTo(startX, midY);
+        ctx.lineTo(endX, midY);
+        ctx.lineTo(endX, toY);
+        ctx.stroke();
+      }
+
+      if (!edge.conditional && edge.label) {
+        ctx.font = '12px "IBM Plex Mono"';
+        ctx.fillStyle = "#333";
+        const midX = (startX + endX) / 2;
+        const midY = (fromY + toY) / 2;
+        ctx.fillText(edge.label, midX - 15, midY - 5);
+      }
+    });
+
+    instructionHitRegions = [];
+
+    nodes.forEach((node) => {
+      const width = 180;
+      const height = 30 + node.instructions.length * 22;
+
+      ctx.fillStyle = "#fefefe";
+      ctx.strokeStyle = "#000000";
+      ctx.lineWidth = 3 / scale;
+      ctx.fillRect(node.x, node.y, width, height);
+      ctx.strokeRect(node.x, node.y, width, height);
+
+      ctx.fillStyle = "#1e1e1e";
+      ctx.font = 'bold 13px "Inter"';
+      ctx.fillText(node.label, node.x + 10, node.y + 22);
+
+      ctx.font = '13px "IBM Plex Mono"';
+      ctx.fillStyle = "#333";
+      let yOffset = node.y + 48;
+      node.instructions.forEach((insn, idx) => {
+        ctx.fillText(insn, node.x + 12, yOffset);
+        const textWidth = ctx.measureText(insn).width;
+        instructionHitRegions.push({
+          nodeId: node.id,
+          insnIndex: idx,
+          insnText: insn,
+          rect: { x: node.x + 10, y: yOffset - 16, w: textWidth + 8, h: 20 },
+        });
+        yOffset += 22;
+      });
+    });
+
+    ctx.restore();
+    updateZoomDisplay();
+  }
+
+  // ---------- Зум и панорамирование ----------
+  $container.on("wheel", function (e) {
+    e.preventDefault();
+    const delta = e.originalEvent.deltaY > 0 ? 0.9 : 1.1;
+    const newScale = Math.min(Math.max(scale * delta, 0.3), 3.0);
+
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const worldX = (mouseX - offsetX) / scale;
+    const worldY = (mouseY - offsetY) / scale;
+
+    scale = newScale;
+    offsetX = mouseX - worldX * scale;
+    offsetY = mouseY - worldY * scale;
+
+    drawGraph();
+  });
+
+  $container.on("mousedown", function (e) {
+    isPanning = true;
+    startPanX = e.clientX - offsetX;
+    startPanY = e.clientY - offsetY;
+    $container.css("cursor", "grabbing");
+  });
+
+  $(window).on("mousemove", function (e) {
+    if (!isPanning) return;
+    offsetX = e.clientX - startPanX;
+    offsetY = e.clientY - startPanY;
+    drawGraph();
+  });
+
+  $(window).on("mouseup", function () {
+    isPanning = false;
+    $container.css("cursor", "grab");
+  });
+
+  $("#zoomInBtn").on("click", function () {
+    scale = Math.min(scale * 1.2, 3.0);
+    drawGraph();
+  });
+  $("#zoomOutBtn").on("click", function () {
+    scale = Math.max(scale / 1.2, 0.3);
+    drawGraph();
+  });
+
+  $zoomLevel.on("click", function () {
+    scale = 1.0;
+    offsetX = 0;
+    offsetY = 0;
+    drawGraph();
+  });
+
+  // ---------- Интерактивность (подсказки, модальное окно) ----------
+  const $tooltip = $("#insnTooltip");
+  const $modalOverlay = $("#modalOverlay");
+  const $modalPre = $("#modalPre");
+  const $closeModalBtn = $("#closeModalBtn");
+
+  function showTooltip(text, x, y) {
+    $tooltip.css({ display: "block", left: x + 15, top: y - 30 }).html(text);
+  }
+
+  function hideTooltip() {
+    $tooltip.hide();
+  }
+
+  function getMetrics(insn) {
+    const lower = insn.toLowerCase();
+    if (lower.includes("test") || lower.includes("cmp"))
+      return { lat: 1, tp: 0.25, uops: 1 };
+    if (lower.includes("mov")) return { lat: 1, tp: 0.25, uops: 1 };
+    if (lower.includes("lea")) return { lat: 1, tp: 0.5, uops: 1 };
+    if (lower.includes("add") || lower.includes("sub"))
+      return { lat: 1, tp: 0.25, uops: 1 };
+    if (lower.includes("j")) return { lat: 1, tp: 0.5, uops: 1 };
+    return { lat: 1, tp: 0.33, uops: 1 };
+  }
+
+  function getIntelSnippet(insn) {
+    return `; ${insn}\n; Intel® 64 and IA-32 Architectures Software Developer’s Manual\n; Vol. 2A 3-XXX\n; Opcode: ...\n; Description: ...\n; Flags affected: OF,SF,ZF,AF,PF,CF`;
+  }
+
+  $canvas.on("mousemove", function (e) {
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+
+    const worldX = (mouseX - offsetX) / scale;
+    const worldY = (mouseY - offsetY) / scale;
+
+    let hit = null;
+    for (let region of instructionHitRegions) {
+      const r = region.rect;
+      if (
+        worldX >= r.x &&
+        worldX <= r.x + r.w &&
+        worldY >= r.y &&
+        worldY <= r.y + r.h
+      ) {
+        hit = region;
+        break;
+      }
+    }
+    if (hit) {
+      const m = getMetrics(hit.insnText);
+      const content = `<strong>${hit.insnText}</strong><br>⏱️ Latency: ${m.lat}<br>⚡ Throughput: ${m.tp}<br>🧩 uOps: ${m.uops}<br><span style="color:#666; font-size:11px;">Ctrl+Click — Intel manual</span>`;
+      showTooltip(content, e.clientX, e.clientY);
+    } else {
+      hideTooltip();
+    }
+  });
+
+  $canvas.on("mouseleave", hideTooltip);
+
+  $canvas.on("click", function (e) {
+    if (!e.ctrlKey) return;
+    const rect = canvas.getBoundingClientRect();
+    const mouseX = e.clientX - rect.left;
+    const mouseY = e.clientY - rect.top;
+    const worldX = (mouseX - offsetX) / scale;
+    const worldY = (mouseY - offsetY) / scale;
+
+    for (let region of instructionHitRegions) {
+      const r = region.rect;
+      if (
+        worldX >= r.x &&
+        worldX <= r.x + r.w &&
+        worldY >= r.y &&
+        worldY <= r.y + r.h
+      ) {
+        $modalPre.text(getIntelSnippet(region.insnText));
+        $modalOverlay.css("visibility", "visible");
+        e.preventDefault();
+        break;
+      }
+    }
+  });
+
+  $closeModalBtn.on("click", function () {
+    $modalOverlay.css("visibility", "hidden");
+  });
+  $modalOverlay.on("click", function (e) {
+    if (e.target === $modalOverlay[0])
+      $modalOverlay.css("visibility", "hidden");
+  });
+
+  // ---------- Селектор функции ----------
+  $("#functionSelect").on("change", function () {
+    console.log("Selected function:", $(this).val());
+    drawGraph();
+  });
+
+  // ---------- Кнопки действий ----------
+  $("#compileBtn").on("click", drawGraph);
+
+  $("#analyzeBtn").on("click", function () {
+    drawGraph();
+  });
+
+  $("#simulateBtn").on("click", function () {
+    alert("Pipeline simulation (demo)");
+  });
+
+  $("#saveBtn").on("click", function () {
+    alert("Save project (demo)");
+  });
+  $("#shareBtn").on("click", function () {
+    alert("Share link (demo)");
+  });
+
+  $(window).on("resize", drawGraph);
+
+  drawGraph();
+});
