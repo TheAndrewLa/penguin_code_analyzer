@@ -497,7 +497,7 @@ $(function () {
     }
     if (hit) {
       const m = getMetrics(hit.insnText);
-      const content = `<strong>${hit.insnText}</strong><br>⏱️ Latency: ${m.lat}<br>⚡ Throughput: ${m.tp}<br>🧩 uOps: ${m.uops}<br><span style="color:#666; font-size:11px;">Ctrl+Click — Intel manual</span>`;
+      const content = `<strong>${hit.insnText}</strong><br>Latency: ${m.lat}<br>Throughput: ${m.tp}<br>uOps: ${m.uops}<br><span style="color:#666; font-size:11px;">Ctrl+Click — Intel manual</span>`;
       showTooltip(content, e.clientX, e.clientY);
     } else {
       hideTooltip();
