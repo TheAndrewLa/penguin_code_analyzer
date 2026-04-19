@@ -214,8 +214,9 @@ $(function () {
       id: "L1",
       label: "L1",
       instructions: ["test edi, edi", "js L4"],
+      edgesIn: [],
       edgesOut: [
-        { to: "L2", conditional: true, taken: false },
+        { to: "L2", fallthrough: true, conditional: true, taken: false },
         { to: "L4", conditional: true, taken: true },
       ],
     },
@@ -223,12 +224,14 @@ $(function () {
       id: "L2",
       label: "L2",
       instructions: ["mov eax, 1", "mov edx, 1", "jmp L3"],
+      edgesIn: [{ from: "L1" }],
       edgesOut: [{ to: "L3" }],
     },
     {
       id: "L5",
       label: "L5",
       instructions: ["mov eax, ecx"],
+      edgesIn: [{ from: "L3" }],
       edgesOut: [{ to: "L3", fallthrough: true }],
     },
     {
@@ -241,8 +244,9 @@ $(function () {
         "cmp edi, -1",
         "jne L3",
       ],
+      edgesIn: [{ from: "L5" }],
       edgesOut: [
-        { to: "L3", conditional: true, taken: true },
+        { to: "L5", conditional: true, taken: true },
         { to: "L6", conditional: true, taken: false },
       ],
     },
@@ -250,12 +254,14 @@ $(function () {
       id: "L4",
       label: "L4",
       instructions: ["mov eax, 1", "ret"],
+      edgesIn: [{ from: "L1" }],
       edgesOut: [],
     },
     {
       id: "L6",
       label: "L6",
       instructions: ["mov eax, ecx", "ret"],
+      edgesIn: [{ from: "L3" }],
       edgesOut: [],
     },
   ];
@@ -288,73 +294,6 @@ $(function () {
     ctx.translate(offsetX, offsetY);
     ctx.scale(scale, scale);
 
-    // edges.forEach((edge) => {
-    //   if (!outgoingMap.has(edge.from)) outgoingMap.set(edge.from, []);
-    //   outgoingMap.get(edge.from).push(edge);
-    // });
-
-    // edges.forEach((edge) => {
-    //   const fromNode = nodes.find((n) => n.id === edge.from);
-    //   const toNode = nodes.find((n) => n.id === edge.to);
-    //   if (!fromNode || !toNode) return;
-
-    //   const fromHeight = 30 + fromNode.instructions.length * 22;
-    //   const toHeight = 30 + toNode.instructions.length * 22;
-
-    //   const fromY = fromNode.y + fromHeight;
-    //   const toY = toNode.y;
-
-    //   const outgoing = outgoingMap.get(edge.from) || [edge];
-    //   const index = outgoing.indexOf(edge);
-    //   const step = nodeWidth / (outgoing.length + 1);
-    //   const startX = fromNode.x + step * (index + 1);
-    //   const endX = toNode.x + nodeWidth / 2;
-
-    //   const isConditional = edge.conditional || false;
-    //   const isTaken = edge.taken || false;
-
-    //   const conditionalColor = isTaken ? "#2e7d32" : "#992017";
-    //   const lineColor = isConditional ? conditionalColor : "#000000";
-
-    //   ctx.beginPath();
-    //   ctx.strokeStyle = lineColor;
-    //   ctx.lineWidth = 2;
-
-    //   if (edge.from === edge.to) {
-    //     const loopCenterX = fromNode.x + nodeWidth + 15;
-    //     const loopCenterY = fromNode.y + fromHeight / 2;
-    //     const radiusX = 25;
-    //     const radiusY = 15;
-
-    //     ctx.beginPath();
-    //     ctx.ellipse(
-    //       loopCenterX,
-    //       loopCenterY,
-    //       radiusX,
-    //       radiusY,
-    //       0,
-    //       0,
-    //       Math.PI * 2,
-    //     );
-    //     ctx.stroke();
-    //   } else {
-    //     const midY = (fromY + toY) / 2;
-    //     ctx.moveTo(startX, fromY);
-    //     ctx.lineTo(startX, midY);
-    //     ctx.lineTo(endX, midY);
-    //     ctx.lineTo(endX, toY);
-    //     ctx.stroke();
-    //   }
-
-    //   if (!edge.conditional && edge.label) {
-    //     ctx.font = '12px "IBM Plex Mono"';
-    //     ctx.fillStyle = "#333";
-    //     const midX = (startX + endX) / 2;
-    //     const midY = (fromY + toY) / 2;
-    //     ctx.fillText(edge.label, midX - 15, midY - 5);
-    //   }
-    // });
-
     instructionHitRegions = [];
 
     let nodesCoordinates = new Map();
@@ -382,7 +321,7 @@ $(function () {
       ctx.strokeRect(currentX, currentY, width, height);
 
       ctx.fillStyle = "#1e1e1e";
-      ctx.font = 'bold 14px "IBM Plex Mono';
+      ctx.font = 'bold 14px "Inter';
 
       ctx.fillText(node.label, currentX + 10, currentY + 22);
 
@@ -421,8 +360,16 @@ $(function () {
     nodes.forEach((node) => {
       const startCoords = nodesCoordinates.get(node.id);
 
-      node.edgesOut.forEach((edge) => {
+      node.edgesOut.forEach((edge, idx) => {
         const endCoords = nodesCoordinates.get(edge.to);
+
+        const width = startCoords.width / (node.edgesOut.length + 1);
+
+        const startX = startCoords.x + width * (idx + 1);
+        const startY = startCoords.y + startCoords.height;
+
+        const endX = endCoords.x + endCoords.width / 2;
+        const endY = endCoords.y;
 
         const isFall = edge.fallthrough || false;
         const isConditional = edge.conditional || false;
@@ -435,35 +382,27 @@ $(function () {
         ctx.strokeStyle = lineColor;
         ctx.lineWidth = 1;
 
-        ctx.moveTo(
-          startCoords.x + startCoords.width / 2,
-          startCoords.y + startCoords.height,
-        );
+        ctx.moveTo(startX, startY);
 
         if (isFall) {
-          ctx.lineTo(endCoords.x + endCoords.width / 2, endCoords.y);
+          ctx.lineTo(startX, startY + usedSpace / 3);
+          ctx.lineTo(endX, startY + usedSpace / 3);
+          ctx.lineTo(endX, endY);
         } else {
-          ctx.lineTo(
-            startCoords.x + startCoords.width / 2,
-            startCoords.y + startCoords.height + usedSpace / 3,
-          );
+          ctx.lineTo(startX, startY + usedSpace / 3);
           ctx.lineTo(
             startCoords.x + startCoords.width + usedSpace + 10,
             startCoords.y + startCoords.height + usedSpace / 3,
           );
           ctx.lineTo(
             endCoords.x + endCoords.width + usedSpace + 10,
-            endCoords.y - usedSpace / 3,
+            endY - usedSpace / 3,
           );
-          ctx.lineTo(
-            endCoords.x + endCoords.width / 2,
-            endCoords.y - usedSpace / 3,
-          );
-          ctx.lineTo(endCoords.x + endCoords.width / 2, endCoords.y);
-
-          usedSpace += 10;
+          ctx.lineTo(endX, endY - usedSpace / 3);
+          ctx.lineTo(endX, endY);
         }
 
+        usedSpace += 10;
         ctx.stroke();
       });
     });
