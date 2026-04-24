@@ -13,7 +13,10 @@ class ElfFile;
 
 class ElfSection {
 public:
+  /// Returns pointer to the start of section's content
   std::byte *cbegin() const;
+
+  /// Returns pointer to the end of section's content
   std::byte *cend() const;
 
 private:
@@ -27,10 +30,15 @@ private:
 class ElfFile {
 public:
   /// Opens executable file with given `path`
+  ///
+  /// Throws `std::invalid argument` if file was not opened.
   explicit ElfFile(const std::filesystem::path &path);
 
-  /// Fills the section of ELF file by given name
-  ElfSection getSection(std::string_view name);
+  /// Returns the section of executable file (see `ElfSection` class) by given
+  /// `sectionName`
+  ///
+  /// Throws `std::invalid_argument` if section doesn't exist
+  ElfSection getSection(std::string_view sectionName);
 
 private:
   std::ifstream m_file;
