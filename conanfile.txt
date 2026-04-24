@@ -1,2 +1,0 @@
-[requires]
-userver/2.*
