@@ -4,6 +4,7 @@
 #include <cstddef>
 
 #include <filesystem>
+#include <fstream>
 #include <memory>
 #include <string_view>
 
@@ -30,6 +31,9 @@ public:
 
   /// Fills the section of ELF file by given name
   ElfSection getSection(std::string_view name);
+
+private:
+  std::ifstream m_file;
 };
 } // namespace analyzer
 
