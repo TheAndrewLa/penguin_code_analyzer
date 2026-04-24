@@ -369,7 +369,6 @@ canvas {
     image-rendering: smooth;
 }
 
-/* Tooltip */
 .tooltip {
     position: fixed;
     background: #ffffff;
@@ -389,7 +388,6 @@ canvas {
     color: #0e639c;
 }
 
-/* Модальное окно */
 .modal-overlay {
     position: fixed;
     top: 0;
