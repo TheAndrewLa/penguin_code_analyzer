@@ -1,0 +1,20 @@
+CompileFlags:
+    Add: [-std=c++2b, -Wall, --gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/13]
+    Compiler: g++
+
+Diagnostics:
+    ClangTidy:
+        Add: [modernize-*, performance-*, readability-*, hicpp-*]
+        Remove:
+            [
+                modernize-use-trailing-return-type,
+                modernize-use-nodiscard,
+                hicpp-no-assembler,
+            ]
+
+Index:
+    Background: Build
+    StandardLibrary: true
+
+If:
+    PathMatch: .*\.cpp|.*\.hpp|.*\.cxx|.*\.hxx
