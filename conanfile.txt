@@ -1,0 +1,9 @@
+[requires]
+oatpp/1.3.0
+oatpp-sqlite/1.3.0
+llvm-core/19.1.7
+gtest/1.13.0
+
+[generators]
+CMakeDeps
+CMakeToolchain
