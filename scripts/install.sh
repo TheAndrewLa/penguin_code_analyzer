@@ -2,11 +2,11 @@
 
 set -e
 
-if ! command -v conan &> /dev/null; then
-    source ./venv/bin/activate
-    echo "Installing conan via pip..."
-    pip install conan
-fi
+conan="./venv/bin/conan"
+pip="./venv/bin/pip3"
 
-conan profile detect || true
-conan install . --output-folder=build --build=missing -s build_type=Release
+python3 -m virtualenv venv
+
+$pip install conan
+$conan profile detect || true
+$conan install . --output-folder=build --build=missing -s build_type=Release
