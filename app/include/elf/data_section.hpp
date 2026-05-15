@@ -2,42 +2,48 @@
 #define APP_ELF_DATA_SECTION_HPP
 
 #include <elf/section.hpp>
+#include <types.hpp>
 
-#include <cstdint>
 #include <ranges>
 #include <string>
 #include <vector>
 
 namespace analyzer::elf {
+class ElfParser;
+
 class DataSection : public ElfSection {
 public:
   struct GlobalVariable {
     std::string name;
     std::string type;
-    std::uint64_t size{};
-    std::uint64_t alignment{};
+    u64 size{};
+    u64 alignment{};
   };
 
   using Globals = std::vector<GlobalVariable>;
+  using GlobalsRange = std::ranges::subrange<Globals::const_iterator>;
 
-  DataSection(std::string name, std::size_t size);
+  DataSection(std::string_view name, usize size);
   ~DataSection() override = default;
 
-  void setGlobals(Globals globals);
-  auto globals() const -> std::ranges::subrange<Globals::const_iterator>;
+  GlobalsRange globals() const;
 
 private:
+  friend class ElfParser;
+
+  void setGlobals(Globals &&globals);
+
   Globals m_globals;
 };
 
 class InitializedDataSection final : public DataSection {
 public:
-  explicit InitializedDataSection(std::size_t size);
+  explicit InitializedDataSection(usize size);
 };
 
 class UninitializedDataSection final : public DataSection {
 public:
-  explicit UninitializedDataSection(std::size_t size);
+  explicit UninitializedDataSection(usize size);
 };
 } // namespace analyzer::elf
 

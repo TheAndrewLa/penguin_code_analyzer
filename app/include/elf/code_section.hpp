@@ -2,24 +2,29 @@
 #define APP_ELF_CODE_SECTION_HPP
 
 #include <elf/section.hpp>
+#include <types.hpp>
 
-#include <cstdint>
 #include <ranges>
 #include <string>
 #include <unordered_map>
 
 namespace analyzer::elf {
+class ElfParser;
+
 class CodeSection final : public ElfSection {
 public:
-  using FunctionTable = std::unordered_map<std::string, std::uint64_t>;
+  using FunctionTable = std::unordered_map<std::string, u64>;
+  using FunctionsRange = std::ranges::subrange<FunctionTable::const_iterator>;
 
-  explicit CodeSection(std::size_t size);
+  explicit CodeSection(usize size);
 
-  void setFunctions(FunctionTable functions);
-  auto
-  functions() const -> std::ranges::subrange<FunctionTable::const_iterator>;
+  FunctionsRange functions() const;
 
 private:
+  friend class ElfParser;
+
+  void setFunctions(FunctionTable &&functions);
+
   FunctionTable m_functions;
 };
 } // namespace analyzer::elf

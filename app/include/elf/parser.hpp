@@ -4,27 +4,28 @@
 #include <elf/code_section.hpp>
 #include <elf/data_section.hpp>
 #include <elf/section.hpp>
+#include <elf/utils.hpp>
 
 #include <filesystem>
 #include <fstream>
 
 namespace analyzer::elf {
-class GenericSection final : public ElfSection {
+class UnknownSection final : public ElfSection {
 public:
-  GenericSection(std::string name, std::size_t size);
+  UnknownSection(std::string_view name, usize size);
 };
 
-class ElfFile {
+class ElfParser {
 public:
-  explicit ElfFile(const std::filesystem::path &path);
+  explicit ElfParser(const std::filesystem::path &path);
 
   std::unique_ptr<ElfSection> getSection(std::string_view sectionName);
 
 private:
   struct SectionDescriptor {
-    std::uint64_t offset{};
-    std::uint64_t size{};
-    std::uint32_t type{};
+    offset offsetInFile{};
+    u64 size{};
+    u32 type{};
   };
 
   void parse();
@@ -35,10 +36,11 @@ private:
   std::ifstream m_file;
   std::unordered_map<std::string, SectionDescriptor> m_sectionOffsets;
 
-  std::uint64_t m_symbolTableOffset{};
-  std::uint64_t m_symbolTableSize{};
-  std::uint64_t m_symbolEntrySize{};
-  std::uint64_t m_symbolStringTableOffset{};
+  offset m_symbolTableOffset{};
+  offset m_symbolStringTableOffset{};
+
+  u64 m_symbolTableSize{};
+  u64 m_symbolEntrySize{};
 };
 } // namespace analyzer::elf
 

@@ -4,19 +4,18 @@
 
 using namespace analyzer;
 
-analyzer::elf::DataSection::DataSection(std::string name, std::size_t size)
-    : ElfSection(std::move(name), size) {}
+analyzer::elf::DataSection::DataSection(std::string_view name, usize size)
+    : ElfSection(name, size) {}
 
-void analyzer::elf::DataSection::setGlobals(Globals globals) {
+void analyzer::elf::DataSection::setGlobals(Globals &&globals) {
   m_globals = std::move(globals);
 }
 
-auto analyzer::elf::DataSection::globals() const
-    -> std::ranges::subrange<Globals::const_iterator> {
+elf::DataSection::GlobalsRange analyzer::elf::DataSection::globals() const {
   return {m_globals.cbegin(), m_globals.cend()};
 }
 
-analyzer::elf::InitializedDataSection::InitializedDataSection(std::size_t size)
+analyzer::elf::InitializedDataSection::InitializedDataSection(usize size)
     : DataSection(".data", size) {}
 
 analyzer::elf::UninitializedDataSection::UninitializedDataSection(

@@ -9,13 +9,9 @@ using address = std::uint64_t;
 using offset = std::uint64_t;
 using version = std::uint16_t;
 
-static constexpr auto IDENT_SIZE = std::size_t(16);
+static constexpr auto HEADER_IDENT_SIZE = std::size_t(16);
 
 struct Header {
-  static constexpr std::size_t INDEX_MAG0 = 0;
-  static constexpr std::size_t INDEX_MAG1 = 1;
-  static constexpr std::size_t INDEX_MAG2 = 2;
-  static constexpr std::size_t INDEX_MAG3 = 3;
   static constexpr std::size_t INDEX_CLASS = 4;
   static constexpr std::size_t INDEX_DATA = 5;
   static constexpr std::size_t INDEX_VERSION = 6;
@@ -23,13 +19,22 @@ struct Header {
   static constexpr std::size_t INDEX_ABIVERSION = 8;
   static constexpr std::size_t INDEX_PAD = 9;
 
-  static constexpr auto MAGIC = "\177ELF";
-  static constexpr std::size_t MAGIC_SIZE = 4;
+  static constexpr bool ValidMagic(Header header) noexcept {
+    constexpr std::size_t INDEX_MAGIC_0 = 0;
+    constexpr std::size_t INDEX_MAGIC_1 = 1;
+    constexpr std::size_t INDEX_MAGIC_2 = 2;
+    constexpr std::size_t INDEX_MAGIC_3 = 3;
 
-  static constexpr auto MAGIC_0 = char(0x7F);
-  static constexpr auto MAGIC_1 = 'E';
-  static constexpr auto MAGIC_2 = 'L';
-  static constexpr auto MAGIC_3 = 'F';
+    constexpr auto MAGIC_0 = char(0x7F);
+    constexpr auto MAGIC_1 = 'E';
+    constexpr auto MAGIC_2 = 'L';
+    constexpr auto MAGIC_3 = 'F';
+
+    return header.ident[INDEX_MAGIC_0] == MAGIC_0 &&
+           header.ident[INDEX_MAGIC_1] == MAGIC_1 &&
+           header.ident[INDEX_MAGIC_2] == MAGIC_2 &&
+           header.ident[INDEX_MAGIC_3] == MAGIC_3;
+  }
 
   static constexpr char CLASS_NONE = 0;
   static constexpr char CLASS_32 = 1;
@@ -42,7 +47,7 @@ struct Header {
   static constexpr u32 VERSION_NONE = 0;
   static constexpr u32 VERSION_CURRENT = 1;
 
-  unsigned char ident[IDENT_SIZE];
+  unsigned char ident[HEADER_IDENT_SIZE];
   u16 type;
   u16 machine;
   u32 version;
@@ -65,7 +70,7 @@ struct ProgramHeader {
 
   u32 type;
   u32 flags;
-  offset offset;
+  offset offsetInFile;
   address virtualAddress;
   address physicalAddress;
   u64 sizeInFile;
@@ -101,7 +106,7 @@ struct SectionHeader {
   u32 name;
   u32 type;
   u64 flags;
-  offset offset;
+  offset offsetInFile;
   address virtualAddress;
   address physicalAddress;
   u64 size;
