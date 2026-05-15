@@ -1,20 +1,14 @@
 #ifndef APP_ELF_PARSER_HPP
 #define APP_ELF_PARSER_HPP
 
-#include "code_section.hpp"
-#include "data_section.hpp"
-#include "section.hpp"
+#include <elf/code_section.hpp>
+#include <elf/data_section.hpp>
+#include <elf/section.hpp>
 
-#include <cstdint>
 #include <filesystem>
 #include <fstream>
-#include <memory>
-#include <string>
-#include <string_view>
-#include <unordered_map>
 
-namespace analyzer {
-
+namespace analyzer::elf {
 class GenericSection final : public ElfSection {
 public:
   GenericSection(std::string name, std::size_t size);
@@ -34,7 +28,8 @@ private:
   };
 
   void parse();
-  void fillSectionPayload(ElfSection &section, const SectionDescriptor &descriptor);
+  void fillSectionPayload(ElfSection &section,
+                          const SectionDescriptor &descriptor);
   void enrichSymbols(CodeSection *codeSection, DataSection *dataSection);
 
   std::ifstream m_file;
@@ -45,7 +40,6 @@ private:
   std::uint64_t m_symbolEntrySize{};
   std::uint64_t m_symbolStringTableOffset{};
 };
-
-} // namespace analyzer
+} // namespace analyzer::elf
 
 #endif

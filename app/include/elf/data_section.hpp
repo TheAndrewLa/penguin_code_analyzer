@@ -1,15 +1,14 @@
 #ifndef APP_ELF_DATA_SECTION_HPP
 #define APP_ELF_DATA_SECTION_HPP
 
-#include "section.hpp"
+#include <elf/section.hpp>
 
 #include <cstdint>
 #include <ranges>
 #include <string>
 #include <vector>
 
-namespace analyzer {
-
+namespace analyzer::elf {
 class DataSection : public ElfSection {
 public:
   struct GlobalVariable {
@@ -40,7 +39,6 @@ class UninitializedDataSection final : public DataSection {
 public:
   explicit UninitializedDataSection(std::size_t size);
 };
-
-} // namespace analyzer
+} // namespace analyzer::elf
 
 #endif
