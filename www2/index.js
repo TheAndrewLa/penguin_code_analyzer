@@ -94,7 +94,7 @@
         },
     ];
 
-    const RESOURCE_NAMES = [
+    const ALL_RESOURCE_NAMES = [
         "HWDivider",
         "HWFPDivider",
         "HWPort0",
@@ -106,8 +106,16 @@
         "HWPort6",
         "HWPort7",
     ];
+
     const RESOURCE_PRESSURE_PER_ITER = [
-        0, 0, 2.51, 2.5, 0.67, 0.67, 1.0, 2.5, 2.51, 0.67,
+        { name: "HWPort0", pressure: 2.51 },
+        { name: "HWPort1", pressure: 2.5 },
+        { name: "HWPort2", pressure: 0.67 },
+        { name: "HWPort3", pressure: 0.67 },
+        { name: "HWPort4", pressure: 1.0 },
+        { name: "HWPort5", pressure: 2.5 },
+        { name: "HWPort6", pressure: 2.51 },
+        { name: "HWPort7", pressure: 0.67 },
     ];
 
     const INSTRUCTION_PRESSURE = [
@@ -571,23 +579,26 @@
         },
     ];
 
-    // ---------- GLOBALS ----------
     let editor = null;
     let activeTab = "general";
     let canvasScale = 1.0;
-    let currentPanX = 0,
-        currentPanY = 0;
+
+    let currentPanX = 0;
+    let currentPanY = 0;
+
     let isDragging = false;
-    let dragStartX = 0,
-        dragStartY = 0;
+
+    let dragStartX = 0;
+    let dragStartY = 0;
+
     let showLegend = false;
     const canvasElem = document.getElementById("analyzerCanvas");
     const graphContainer = document.getElementById("graphContainer");
     let ctx = null;
-    let canvasWidth = 0,
-        canvasHeight = 0;
 
-    // ---------- CodeMirror Setup (read-only) ----------
+    let canvasWidth = 0;
+    let canvasHeight = 0;
+
     const editorWrapper = document.getElementById("editorWrapper");
     const textarea = document.createElement("textarea");
     textarea.id = "asm-editor";
@@ -603,19 +614,10 @@
         readOnly: true,
         cursorBlinkRate: -1,
     });
-    const sampleAsm = `movb $5, %ah
-movb $5, %al
-movl $6, %eax
-movb $6, %al
-movb $7, %ah
-movl $7, %eax
-movb $8, %ah
-movb $8, %al
-decl ecx
-jne .loop`;
+
+    const sampleAsm = `Function:\n\tmovb $5, %ah\n\tmovb $5, %al\n\tmovl $6, %eax\n\tmovb $6, %al\n\tmovb $7, %ah\n\tmovl $7, %eax\n\tmovb $8, %ah\n\tmovb $8, %al\n\tdecl ecx\n\tjne .loop`;
     editor.setValue(sampleAsm);
 
-    // ---------- Canvas helpers ----------
     function resizeCanvas() {
         if (!graphContainer) return;
         const rect = graphContainer.getBoundingClientRect();
@@ -655,18 +657,17 @@ jne .loop`;
         redrawCanvas();
     }
 
-    // Legend items per tab
     function getLegendItems() {
         if (activeTab === "info") {
             return [
-                "ML = MayLoad",
-                "MS = MayStore",
-                "SideFx = Side Effects",
+                "ML = May load",
+                "MS = May store",
+                "SideFx = Has side effects",
                 "Lat = Latency",
-                "uOps = micro-ops",
+                "uOps = micro-operations",
             ];
         } else if (activeTab === "resource") {
-            return RESOURCE_NAMES.map((name) => name.substring(0, 8));
+            return ALL_RESOURCE_NAMES.map((name) => name.substring(0, 8));
         } else if (activeTab === "timeline") {
             return [
                 "D = Dispatch",
@@ -675,7 +676,6 @@ jne .loop`;
                 "R = Retire",
                 "= = Waiting for data",
                 "- = Waiting to execute",
-                ". = Idle",
             ];
         }
         return [];
@@ -728,7 +728,6 @@ jne .loop`;
         drawLegend();
     }
 
-    // ------------------- DRAWING FUNCTIONS -------------------
     function drawGeneralResults() {
         const metrics = [
             { label: "Iterations:", value: "200" },
@@ -742,14 +741,14 @@ jne .loop`;
         ];
         const startX = 40;
         let startY = 40;
-        ctx.font = `18px "IBM Plex Mono"`;
+        ctx.font = `15px "IBM Plex Mono"`;
         ctx.fillStyle = "#1e1e1e";
         metrics.forEach((m, idx) => {
-            ctx.fillText(`${m.label}`, startX, startY + idx * 38);
-            ctx.font = `18px "Inter"`;
+            ctx.fillText(`${m.label}`, startX, startY + idx * 30);
+            ctx.font = `15px "Inter"`;
             ctx.fillStyle = "#2c3e50";
-            ctx.fillText(`${m.value}`, startX + 250, startY + idx * 38);
-            ctx.font = `18px "IBM Plex Mono"`;
+            ctx.fillText(`${m.value}`, startX + 250, startY + idx * 30);
+            ctx.font = `15px "IBM Plex Mono"`;
             ctx.fillStyle = "#1e1e1e";
         });
     }
@@ -767,8 +766,8 @@ jne .loop`;
             "SideFx",
             "Instructions",
         ];
-        ctx.font = `14px "Inter"`;
-        ctx.fillStyle = "#1e1e1e";
+        ctx.font = `15px "Inter"`;
+        ctx.fillStyle = "black";
         for (let i = 0; i < headers.length; i++) {
             ctx.fillText(
                 headers[i],
@@ -776,17 +775,18 @@ jne .loop`;
                 startY + 6,
             );
         }
-        ctx.strokeStyle = "#c0c0c0";
+        ctx.strokeStyle = "black";
         ctx.lineWidth = 1;
         ctx.beginPath();
         ctx.moveTo(startX, startY + 12);
         ctx.lineTo(startX + 620, startY + 12);
         ctx.stroke();
 
-        let rowY = startY + 32;
+        let rowY = startY + 35;
+
         for (let idx = 0; idx < INSTRUCTION_SET.length; idx++) {
             const ins = INSTRUCTION_SET[idx];
-            ctx.font = `13px "IBM Plex Mono"`;
+            ctx.font = `15px "IBM Plex Mono"`;
             ctx.fillStyle = "#2c3e50";
             ctx.fillText(ins.uOps.toString(), startX + colX[0], rowY);
             ctx.fillText(ins.latency.toString(), startX + colX[1], rowY);
@@ -795,63 +795,89 @@ jne .loop`;
             ctx.fillText(ins.mayStore ? "✓" : "-", startX + colX[4], rowY);
             ctx.fillText(ins.sideEffects ? "U" : "-", startX + colX[5], rowY);
             ctx.fillText(ins.text, startX + colX[6], rowY);
-            rowY += 24;
+            rowY += 25;
         }
     }
 
     function drawResourceUsage() {
-        let yOff = 35;
-        ctx.font = `bold 14px "Inter"`;
-        ctx.fillStyle = "#0e639c";
-        ctx.fillText("RESOURCE PRESSURE PER ITERATION", 20, yOff);
-        yOff += 28;
-        const barStartX = 25;
-        const barWidth = 45;
-        const maxPressure = 3.5;
-        for (let i = 0; i < RESOURCE_NAMES.length; i++) {
-            let pressure = RESOURCE_PRESSURE_PER_ITER[i];
-            let x = barStartX + (i % 5) * 115;
-            let rowIdx = Math.floor(i / 5);
-            let barY = yOff + rowIdx * 55;
-            ctx.fillStyle = "#555";
-            ctx.font = `11px "Inter"`;
-            ctx.fillText(RESOURCE_NAMES[i].substring(0, 7), x, barY - 4);
-            let barHeight = (pressure / maxPressure) * 40;
-            ctx.fillStyle = "#fbb613";
-            ctx.fillRect(x, barY, barWidth - 2, barHeight);
-            ctx.fillStyle = "#1e1e1e";
-            ctx.fillText(pressure.toFixed(2), x + 8, barY + barHeight + 14);
-        }
-        yOff += 150;
-        ctx.font = `bold 14px "Inter"`;
-        ctx.fillStyle = "#0e639c";
-        ctx.fillText("RESOURCE PRESSURE BY INSTRUCTION", 20, yOff);
-        yOff += 22;
-        ctx.font = `11px "IBM Plex Mono"`;
-        ctx.fillStyle = "#3a3a3a";
-        const headX = [25, 65, 105, 145, 185, 225, 265, 305, 345, 385, 430];
-        for (let p = 0; p <= 9; p++) {
-            ctx.fillText(`P${p}`, headX[p] + 5, yOff);
-        }
-        ctx.fillText("Instruction", headX[10] + 5, yOff);
-        yOff += 20;
-        for (let i = 0; i < INSTRUCTION_PRESSURE.length; i++) {
-            const press = INSTRUCTION_PRESSURE[i];
-            for (let p = 0; p < press.length; p++) {
-                ctx.fillStyle = "#1e1e1e";
-                ctx.fillText(
-                    press[p].toFixed(2).replace(/^0\./, "."),
-                    headX[p] + 5,
-                    yOff + 2,
-                );
+        let yOffset = 40;
+
+        ctx.font = `bold 16px "Inter"`;
+        ctx.fillStyle = "black";
+        ctx.fillText("RESOURCE PRESSURE BY INSTRUCTION", 20, yOffset);
+        yOffset += 25;
+
+        const activePorts = [];
+        for (let p = 0; p <= 7; p++) {
+            let hasPressure = false;
+            for (let i = 0; i < INSTRUCTION_SET.length; i++) {
+                if (INSTRUCTION_PRESSURE[i][p] > 0.001) {
+                    hasPressure = true;
+                    break;
+                }
             }
-            ctx.fillStyle = "#555";
+            if (hasPressure) activePorts.push(p);
+        }
+
+        for (let p = 8; p <= 9; p++) {
+            let hasPressure = false;
+            for (let i = 0; i < INSTRUCTION_SET.length; i++) {
+                if (INSTRUCTION_PRESSURE[i][p] > 0.001) {
+                    hasPressure = true;
+                    break;
+                }
+            }
+            if (hasPressure) activePorts.push(p);
+        }
+
+        if (activePorts.length === 0) {
+            for (let p = 0; p <= 7; p++) activePorts.push(p);
+        }
+
+        const cellW = 75;
+        const cellH = 35;
+        const portLabelX = 80;
+        const instructionLabelX = 20;
+        const heatmapStartX = portLabelX + 60;
+
+        ctx.font = `15px "IBM Plex Mono"`;
+        ctx.fillStyle = "#3a3a3a";
+        for (let idx = 0; idx < activePorts.length; idx++) {
+            const port = activePorts[idx];
+            const x = heatmapStartX + idx * cellW;
+            ctx.fillText(`P${port}`, x + cellW / 2 - 8, yOffset + 10);
+        }
+
+        yOffset += 20;
+
+        for (let i = 0; i < INSTRUCTION_SET.length; i++) {
+            const ins = INSTRUCTION_SET[i];
+            ctx.fillStyle = "#1e1e1e";
+            ctx.font = `13px "IBM Plex Mono"`;
             ctx.fillText(
-                INSTRUCTION_SET[i].text.substring(0, 26),
-                headX[10] + 5,
-                yOff + 2,
+                ins.text.substring(0, 22),
+                instructionLabelX,
+                yOffset + cellH - 6,
             );
-            yOff += 22;
+
+            for (let idx = 0; idx < activePorts.length; idx++) {
+                const port = activePorts[idx];
+                const pressure = INSTRUCTION_PRESSURE[i][port] || 0;
+                const x = heatmapStartX + idx * cellW;
+                const intensity = Math.min(1, pressure / 1.0);
+                const r = 255;
+                const g = 200 + Math.floor(55 * (1 - intensity));
+                const b = 100 + Math.floor(100 * (1 - intensity));
+                ctx.fillStyle = `rgb(${r}, ${g}, ${b})`;
+                ctx.fillRect(x, yOffset, cellW - 2, cellH - 2);
+                if (pressure > 0.01) {
+                    ctx.fillStyle = "black";
+                    ctx.font = `15px monospace`;
+                    ctx.fillText(pressure.toFixed(2), x + 5, yOffset + 15);
+                }
+            }
+            yOffset += cellH;
+            if (yOffset > canvasHeight / canvasScale - 40) break;
         }
     }
 
@@ -884,9 +910,9 @@ jne .loop`;
             // if (currentY + cellH > canvasHeight / canvasScale + 200) break;
 
             ctx.fillStyle = "#7f8c8d";
-            ctx.font = `11px monospace`;
+            ctx.font = `14px monospace`;
             ctx.fillText(
-                `${entry.iteration},${entry.instructionIndex}`,
+                `${entry.iteration}, ${entry.instructionIndex}`,
                 startX - 45,
                 currentY + 15,
             );
@@ -928,14 +954,14 @@ jne .loop`;
                 }
                 ctx.fillRect(xPos, yPos, cellW - 1, cellH - 2);
                 ctx.fillStyle = "#1e1e1e";
-                ctx.font = `10px monospace`;
+                ctx.font = `14px monospace`;
                 if (state !== ".") {
                     ctx.fillText(state, xPos + 5, yPos + 16);
                 }
             }
 
             ctx.fillStyle = "#2c3e50";
-            ctx.font = `11px "IBM Plex Mono"`;
+            ctx.font = `14px "IBM Plex Mono"`;
             ctx.fillText(
                 entry.instructionText.substring(0, 30),
                 startX + maxCycles * cellW + 12,
