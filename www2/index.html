@@ -1,0 +1,67 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Penguin · Code Analyzer</title>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/theme/eclipse.min.css">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.5.1/css/all.min.css">
+    <link href="https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500&family=Inter:wght@400;500;600&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="index.css">
+</head>
+
+<body>
+    <div class="top-bar">
+        <div class="logo-container">
+            <img src="./assets/logo.png" alt="Analyzing penguin">
+            <div class="logo-area">
+                <div class="logo-penguin">penguin</div>
+                <div class="logo-sub">code analyzer</div>
+            </div>
+        </div>
+        <div class="top-actions">
+            <button class="secondary" id="saveBtn">Save<i class="fa-solid fa-download"></i></button>
+            <button class="secondary" id="shareBtn">Share<i class="fa-solid fa-share-nodes"></i></button>
+        </div>
+    </div>
+
+    <div class="main-container">
+        <div class="left-panel">
+            <div class="editor-wrapper" id="editorWrapper"></div>
+        </div>
+
+        <div class="right-panel">
+            <div class="toolbar">
+                <div class="graph-actions">
+                    <button class="secondary" id="backToEditorBtn">Back to editor</button>
+                    <button class="secondary" id="legendToggleBtn">Show legend</button>
+                    <div class="zoom-controls">
+                        <button class="secondary zoom-btn" id="zoomOutBtn" title="Zoom out">-</button>
+                        <button class="secondary zoom-btn" id="zoomLevel">100%</button>
+                        <button class="secondary zoom-btn" id="zoomInBtn" title="Zoom in">+</button>
+                    </div>
+                </div>
+            </div>
+            <div class="toolbar">
+                <div class="tab-bar" id="tabBar">
+                    <div class="tab active" data-tab="general">General results</div>
+                    <div class="tab" data-tab="info">Instruction info</div>
+                    <div class="tab" data-tab="resource">Resource usage</div>
+                    <div class="tab" data-tab="timeline">Timeline view</div>
+                </div>
+            </div>
+            <div class="graph-container" id="graphContainer">
+                <canvas id="analyzerCanvas"></canvas>
+            </div>
+        </div>
+    </div>
+
+    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/clike/clike.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.16/mode/gas/gas.min.js"></script>
+    <script src="index.js"></script>
+</body>
+</html>
