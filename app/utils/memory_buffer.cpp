@@ -1,4 +1,5 @@
 #include <ranges>
+#include <stdexcept>
 #include <utils/memory_buffer.hpp>
 
 #include <vector>
@@ -22,7 +23,7 @@ analyzer::utils::MemoryBuffer::MemoryBuffer(std::istream &stream) {
 void analyzer::utils::MemoryBuffer::writeString(std::size_t offset,
                                                 std::string_view string) {
   if (offset + string.size() > m_size) {
-    throw std::runtime_error{"Failed to write string to memory buffer"};
+    throw std::out_of_range{"Failed to write string to memory buffer"};
   }
   auto *dest = m_data.get() + offset;
   auto view = string | std::views::transform(
@@ -49,7 +50,7 @@ std::string
 analyzer::utils::MemoryBuffer::readString(std::size_t offset,
                                           std::size_t length) const {
   if (offset + length > m_size) {
-    throw std::runtime_error{"Failed to read string from memory buffer"};
+    throw std::out_of_range{"Failed to read string from memory buffer"};
   }
   std::string result;
   const auto *data = m_data.get() + offset;
@@ -64,7 +65,7 @@ analyzer::utils::MemoryBuffer::readString(std::size_t offset,
 utils::MemoryView
 analyzer::utils::MemoryBuffer::toView(std::size_t offset) const {
   if (offset >= m_size) {
-    throw std::runtime_error{"Failed to create view from memory buffer"};
+    throw std::out_of_range{"Failed to create view from memory buffer"};
   }
   auto *begin = m_data.get() + offset;
   auto *end = m_data.get() + m_size;
@@ -75,7 +76,7 @@ utils::MemoryView
 analyzer::utils::MemoryBuffer::toView(std::size_t offset,
                                       std::size_t length) const {
   if (offset + length > m_size) {
-    throw std::runtime_error{"Failed to create view from memory buffer"};
+    throw std::out_of_range{"Failed to create view from memory buffer"};
   }
   auto *begin = m_data.get() + offset;
   return {begin, begin + length};

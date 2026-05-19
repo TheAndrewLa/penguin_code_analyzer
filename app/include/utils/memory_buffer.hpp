@@ -43,7 +43,7 @@ public:
   template <MemoryBufferWriteType T>
   void writeStruct(std::size_t offset, const T &value) {
     if (offset + sizeof(T) > m_size) {
-      throw std::runtime_error{"Failed to write struct to memory buffer"};
+      throw std::out_of_range{"Failed to write struct to memory buffer"};
     }
     auto *ptr = std::addressof(m_data[offset]);
     *reinterpret_cast<T *>(ptr) = value;
@@ -52,7 +52,7 @@ public:
   template <MemoryBufferReadType T>
   void readStruct(std::size_t offset, T &result) const {
     if (offset + sizeof(T) > m_size) {
-      throw std::runtime_error{"Failed to read struct from memory buffer"};
+      throw std::out_of_range{"Failed to read struct from memory buffer"};
     }
     const auto *ptr = std::addressof(m_data[offset]);
     result = *reinterpret_cast<const T *>(ptr);
