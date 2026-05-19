@@ -1008,6 +1008,7 @@
                     redrawCanvas();
                 }
             }
+            legendBtn.textContent = showLegend ? "Hide legend" : "Show legend";
         });
 
         document.querySelectorAll(".tab").forEach((tab) => {
@@ -1024,6 +1025,9 @@
                         redrawCanvas();
                     }
                 }
+                legendBtn.textContent = showLegend
+                    ? "Hide legend"
+                    : "Show legend";
             });
         });
 
