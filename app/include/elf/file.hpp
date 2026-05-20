@@ -4,7 +4,9 @@
 #include <elf/code_section.hpp>
 #include <elf/data_section.hpp>
 #include <elf/platform.hpp>
+#include <elf/section_data.hpp>
 #include <filesystem>
+#include <utility>
 #include <utils/memory_buffer.hpp>
 
 namespace analyzer::elf {
@@ -31,10 +33,12 @@ public:
 
   Platform platform() const noexcept;
 
-  CodeSection codeSection() const;
-  DataSection dataSection() const;
-  RodataSection rodataSection() const;
-  DataSectionTLS dataSectionTLS() const;
+  SectionData getSection(std::string_view name) const;
+
+  std::pair<SectionData, CodeSection> codeSection() const;
+  std::pair<SectionData, DataSection> dataSection() const;
+  std::pair<SectionData, RodataSection> rodataSection() const;
+  std::pair<SectionData, DataSectionTLS> dataSectionTLS() const;
 
 private:
   utils::MemoryBuffer m_fileContent;

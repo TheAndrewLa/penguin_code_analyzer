@@ -51,6 +51,12 @@ struct Header {
   static constexpr char ABI_OPENVMS = 13;
   static constexpr char ABI_NSK = 14;
 
+  static constexpr std::uint16_t MACHINE_X86 = 3;
+  static constexpr std::uint16_t MACHINE_X86_64 = 62;
+  static constexpr std::uint16_t MACHINE_ARM = 40;
+  static constexpr std::uint16_t MACHINE_ARM64 = 183;
+  static constexpr std::uint16_t MACHINE_POWERPC = 20;
+
   static constexpr std::uint32_t VERSION_NONE = 0;
   static constexpr std::uint32_t VERSION_CURRENT = 1;
 
