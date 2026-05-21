@@ -1,6 +1,0 @@
-[requires]
-llvm-core/19.1.7
-
-[generators]
-CMakeDeps
-CMakeToolchain
