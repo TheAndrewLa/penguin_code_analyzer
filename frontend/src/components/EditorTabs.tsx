@@ -1,10 +1,16 @@
 import React, { useState } from "react";
 import * as Popover from "@radix-ui/react-popover";
 import { Play, SlidersHorizontal, X, Plus } from "lucide-react";
-import { EditorTab } from "../types";
 import SelectField from "./primitives/SelectField";
 
-interface TabBarProps {
+export interface EditorTab {
+    id: number;
+    name: string;
+    type: "c" | "cpp" | "asm" | "binary";
+    content: string;
+}
+
+interface EditorTabsProps {
     tabs: EditorTab[];
     activeId: number | null;
     onSelect: (id: number) => void;
@@ -18,7 +24,7 @@ interface TabBarProps {
     maxTabs?: number;
 }
 
-const TabBar: React.FC<TabBarProps> = ({
+export const EditorTabs: React.FC<EditorTabsProps> = ({
     tabs,
     activeId,
     onSelect,
@@ -173,7 +179,7 @@ const TabBar: React.FC<TabBarProps> = ({
                 </Popover.Root>
             </div>
 
-            <div className="flex items-center gap-2 flex-shrink-0 ml-2">
+            <div className="flex gap-2">
                 <SelectField
                     value={compiler}
                     onChange={onCompilerChange}
@@ -181,14 +187,15 @@ const TabBar: React.FC<TabBarProps> = ({
                 />
 
                 <button
-                    className="w-7 h-7 flex items-center justify-center rounded bg-gray-200 hover:bg-gray-300"
+                    className="px-3 py-1 text-black bg-gray-200 rounded-md hover:bg-gray-300"
                     onClick={onOpenOptions}
+                    title="Edit compile options"
                 >
                     <SlidersHorizontal size="1rem" />
                 </button>
 
                 <button
-                    className="w-7 h-7 flex items-center justify-center rounded text-white bg-blue-600 hover:bg-blue-700"
+                    className="px-3 py-1 text-white bg-blue-600 rounded-md hover:bg-blue-700"
                     onClick={onCompile}
                 >
                     <Play size="1rem" />
@@ -197,5 +204,3 @@ const TabBar: React.FC<TabBarProps> = ({
         </div>
     );
 };
-
-export default TabBar;

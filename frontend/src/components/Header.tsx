@@ -1,7 +1,11 @@
 import React from "react";
-import { Share2 } from "lucide-react";
+import { Info } from "lucide-react";
 
-const Header: React.FC = () => {
+interface HeaderProps {
+    onShowInfo: () => void;
+}
+
+const Header: React.FC<HeaderProps> = ({ onShowInfo }) => {
     return (
         <header className="flex items-center justify-between px-6 h-16 bg-base-200 border-b border-base-300 flex-shrink-0">
             <div className="flex items-center gap-3">
@@ -11,17 +15,20 @@ const Header: React.FC = () => {
                     className="h-10 w-auto"
                 />
                 <div>
-                    <div className="text-xl text-accent tracking-wide">
+                    <div className="text-xl tracking-wider font-semibold text-black">
                         Penguin
                     </div>
-                    <div className="text-xs font-medium text-neutral/60 tracking-widest uppercase">
+                    <div className="text-xs font-medium tracking-widest uppercase font-mono text-gray-700">
                         code analyzer
                     </div>
                 </div>
             </div>
-            <button className="inline-flex items-center justify-center gap-2 px-3 py-1 text-lg font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300">
-                Share
-                <Share2 size="1.125rem" />
+            <button
+                className="flex flex-row gap-2 items-center px-3 py-1 text-lg font-medium text-gray-700 bg-gray-200 rounded-md hover:bg-gray-300"
+                onClick={onShowInfo}
+            >
+                Info
+                <Info size="1.125rem" />
             </button>
         </header>
     );

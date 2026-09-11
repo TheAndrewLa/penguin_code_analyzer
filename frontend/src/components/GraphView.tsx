@@ -6,10 +6,8 @@ import React, {
     useState,
 } from "react";
 
-import { Toggle } from "@radix-ui/react-toggle";
 import { Plus, Minus } from "lucide-react";
-import { Node, InstructionRegion } from "../types";
-import GraphNode from "./GraphNode";
+import { Node, InstructionRegion, GraphNode } from "./GraphNode";
 
 interface GraphViewProps {
     nodes: Node[];
@@ -19,10 +17,6 @@ interface GraphViewProps {
         mouseY: number,
     ) => void;
     onClick: (region: InstructionRegion) => void;
-    scale: number;
-    offset: { x: number; y: number };
-    setScale: (s: number) => void;
-    setOffset: (o: { x: number; y: number }) => void;
 }
 
 // Measure text width using a hidden span
@@ -39,10 +33,12 @@ const measureTextWidth = (text: string, font: string): number => {
     return width;
 };
 
-// Edge classification
-type EdgeType = "adjacent" | "back" | "longForward";
+enum EdgeType {
+    Adjacent = "adjacent",
+    Back = "back",
+    LongForward = "longForward",
+}
 
-// Layout data structure for a node
 interface LayoutNode extends Node {
     x: number;
     y: number;
@@ -51,7 +47,6 @@ interface LayoutNode extends Node {
     level: number;
 }
 
-// Port assignment
 interface Port {
     x: number;
     y: number;
@@ -63,18 +58,14 @@ interface EdgePorts {
     pathD: string;
 }
 
-const GraphCanvas: React.FC<GraphViewProps> = ({
-    nodes,
-    onHover,
-    onClick,
-    scale,
-    offset,
-    setScale,
-    setOffset,
-}) => {
+export const GraphView: React.FC<GraphViewProps> = ({ nodes, onHover, onClick }) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const isPanning = useRef(false);
     const startPan = useRef({ x: 0, y: 0 });
+
+    // Internal state for zoom and pan
+    const [scale, setScale] = useState(1);
+    const [offset, setOffset] = useState({ x: 0, y: 0 });
 
     // Main layout computation
     const layout = useMemo(() => {
@@ -131,11 +122,13 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
 
         // --- 3. Group nodes by level ---
         const levelGroups: Record<number, Node[]> = {};
+
         nodes.forEach((n) => {
             const l = level[n.id] ?? 0;
             if (!levelGroups[l]) levelGroups[l] = [];
             levelGroups[l].push(n);
         });
+
         const maxLevel = Math.max(...Object.keys(levelGroups).map(Number));
 
         // --- 4. Compute node dimensions ---
@@ -206,12 +199,12 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
                 const toLevel = level[e.to] ?? 0;
                 let type: EdgeType;
                 if (toLevel === fromLevel + 1) {
-                    type = "adjacent";
+                    type = EdgeType.Adjacent;
                 } else if (toLevel > fromLevel + 1) {
-                    type = "longForward";
+                    type = EdgeType.LongForward;
                     longForwardCount++;
                 } else {
-                    type = "back";
+                    type = EdgeType.Back;
                     backEdgeCount++;
                 }
                 edges.push({ from: n.id, to: e.to, type });
@@ -220,6 +213,7 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
 
         const laneWidth = 20;
         const lanePadding = 10;
+
         const leftMargin = Math.max(
             80,
             longForwardCount * (laneWidth + lanePadding) + 20,
@@ -288,12 +282,15 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
             const toId = edge.to;
             // Source side: adjacent and back use bottom; longForward use left
             let srcSide: "bottom" | "left" =
-                edge.type === "adjacent" || edge.type === "back"
+                edge.type === EdgeType.Adjacent || edge.type === EdgeType.Back
                     ? "bottom"
                     : "left";
             // Target side: adjacent use top; back also use top; longForward use left
             let tgtSide: "top" | "left";
-            if (edge.type === "adjacent" || edge.type === "back") {
+            if (
+                edge.type === EdgeType.Adjacent ||
+                edge.type === EdgeType.Back
+            ) {
                 tgtSide = "top";
             } else {
                 tgtSide = "left";
@@ -350,11 +347,14 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
             const fromId = edge.from;
             const toId = edge.to;
             let srcSide: "bottom" | "left" =
-                edge.type === "adjacent" || edge.type === "back"
+                edge.type === EdgeType.Adjacent || edge.type === EdgeType.Back
                     ? "bottom"
                     : "left";
             let tgtSide: "top" | "left";
-            if (edge.type === "adjacent" || edge.type === "back") {
+            if (
+                edge.type === EdgeType.Adjacent ||
+                edge.type === EdgeType.Back
+            ) {
                 tgtSide = "top";
             } else {
                 tgtSide = "left";
@@ -409,7 +409,7 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
         const maxX = maxNodeX + maxNodeWidth;
 
         // Back edges (right side)
-        const backEdges = edges.filter((e) => e.type === "back");
+        const backEdges = edges.filter((e) => e.type === EdgeType.Back);
         backEdges.sort((a, b) => {
             const la = level[a.from] ?? 0;
             const lb = level[b.from] ?? 0;
@@ -445,7 +445,7 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
         });
 
         // Long forward edges (left side)
-        const longEdges = edges.filter((e) => e.type === "longForward");
+        const longEdges = edges.filter((e) => e.type === EdgeType.LongForward);
         longEdges.sort((a, b) => {
             const la = level[a.from] ?? 0;
             const lb = level[b.from] ?? 0;
@@ -474,7 +474,7 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
         });
 
         // Adjacent edges (straight vertical)
-        const adjacentEdges = edges.filter((e) => e.type === "adjacent");
+        const adjacentEdges = edges.filter((e) => e.type === EdgeType.Adjacent);
         adjacentEdges.forEach((edge) => {
             const key = edge.from + "->" + edge.to;
             const ports = edgePorts[key];
@@ -501,7 +501,6 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
         return { nodeData, edgePaths };
     }, [nodes]);
 
-    // Zoom/pan handlers (unchanged)
     const handleWheel = useCallback(
         (e: WheelEvent) => {
             e.preventDefault();
@@ -519,7 +518,7 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
                 y: mouseY - worldY * newScale,
             });
         },
-        [scale, offset, setScale, setOffset],
+        [scale, offset],
     );
 
     const handleMouseDown = useCallback(
@@ -535,17 +534,14 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
         [offset],
     );
 
-    const handleMouseMove = useCallback(
-        (e: MouseEvent) => {
-            if (isPanning.current) {
-                setOffset({
-                    x: e.clientX - startPan.current.x,
-                    y: e.clientY - startPan.current.y,
-                });
-            }
-        },
-        [setOffset],
-    );
+    const handleMouseMove = useCallback((e: MouseEvent) => {
+        if (isPanning.current) {
+            setOffset({
+                x: e.clientX - startPan.current.x,
+                y: e.clientY - startPan.current.y,
+            });
+        }
+    }, []);
 
     const handleMouseUp = useCallback(() => {
         isPanning.current = false;
@@ -569,16 +565,16 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
     const resetView = useCallback(() => {
         setScale(1);
         setOffset({ x: 0, y: 0 });
-    }, [setScale, setOffset]);
+    }, []);
 
     const zoomIn = useCallback(
         () => setScale(Math.min(scale * 1.2, 3.0)),
-        [setScale, scale],
+        [scale],
     );
 
     const zoomOut = useCallback(
         () => setScale(Math.max(scale / 1.2, 0.3)),
-        [setScale, scale],
+        [scale],
     );
 
     const [selectedNode, setSelectedNode] = useState<string | null>(null);
@@ -587,7 +583,6 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
         setSelectedNode((prev) => (prev === id ? null : id));
     }, []);
 
-    // Instruction hover/click handlers (unchanged)
     const handleInstructionHover = useCallback(
         (region: InstructionRegion | null, e: React.MouseEvent) => {
             if (region) {
@@ -612,9 +607,8 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
             className="flex-1 relative overflow-hidden bg-base-100 cursor-grab"
             style={{
                 backgroundImage: `
-          linear-gradient(rgba(200, 200, 200, 0.3) 1px, transparent 1px),
-          linear-gradient(90deg, rgba(200, 200, 200, 0.3) 1px, transparent 1px)
-        `,
+                linear-gradient(rgba(200, 200, 200, 0.3) 1px, transparent 1px),
+                linear-gradient(90deg, rgba(200, 200, 200, 0.3) 1px, transparent 1px)`,
                 backgroundSize: "30px 30px",
             }}
         >
@@ -713,5 +707,3 @@ const GraphCanvas: React.FC<GraphViewProps> = ({
         </div>
     );
 };
-
-export default GraphCanvas;

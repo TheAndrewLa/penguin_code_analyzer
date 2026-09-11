@@ -15,7 +15,6 @@
     "@radix-ui/react-label": "^2.1.0",
     "@radix-ui/react-popover": "^1.1.23",
     "@radix-ui/react-select": "^2.1.2",
-    "@radix-ui/react-toggle": "^1.1.18",
     "@uiw/react-codemirror": "^4.21.25",
     "lucide-react": "^1.37.0",
     "path": "^0.12.7",

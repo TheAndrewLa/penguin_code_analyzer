@@ -5,7 +5,7 @@ interface GraphToolbarProps {
     onSimulate: () => void;
 }
 
-const GraphToolbar: React.FC<GraphToolbarProps> = ({ onSimulate }) => {
+export const GraphToolbar: React.FC<GraphToolbarProps> = ({ onSimulate }) => {
     const [uArch, setUArch] = useState("Haswell");
     const [func, setFunc] = useState("fib(int)");
 
@@ -37,5 +37,3 @@ const GraphToolbar: React.FC<GraphToolbarProps> = ({ onSimulate }) => {
         </div>
     );
 };
-
-export default GraphToolbar;

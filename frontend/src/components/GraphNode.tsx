@@ -1,5 +1,24 @@
 import React from "react";
-import { Node, InstructionRegion } from "../types";
+
+export interface InstructionRegion {
+    node: string;
+    instrIndex: number;
+    instrText: string;
+}
+
+export interface Edge {
+    to: string;
+    fallthrough?: boolean;
+    conditional?: boolean;
+    taken?: boolean;
+}
+
+export interface Node {
+    id: string;
+    label: string;
+    instructions: string[];
+    edgesOut: Edge[];
+}
 
 interface GraphNodeProps {
     node: Node;
@@ -19,7 +38,7 @@ interface GraphNodeProps {
     selected?: boolean;
 }
 
-const GraphNode: React.FC<GraphNodeProps> = ({
+export const GraphNode: React.FC<GraphNodeProps> = ({
     node,
     x,
     y,
@@ -76,5 +95,3 @@ const GraphNode: React.FC<GraphNodeProps> = ({
         </div>
     );
 };
-
-export default GraphNode;

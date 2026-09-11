@@ -1,4 +1,7 @@
-import { Node, TimelineEntry } from "./types";
+import { Node } from "./components/GraphNode";
+import { TimelineEntry } from "./components/SimViewTimeline";
+import { InstructionInfo } from "./components/SimViewInstructions";
+import { ArchitectureInfo } from "./components/SimViewResources";
 
 export const nodes: Node[] = [
     {
@@ -61,46 +64,152 @@ export const defaultCppContent = `int fib(int n) {
     return current;
 }`;
 
-export const defaultAsmContent = `.globl fib
-fib:
-    test edi, edi
-    jle .L4
-    mov eax,1
-    mov edx,1
-.L3:
-    sub edi,1
-    lea ecx,[rdx+rax]
-    mov edx,eax
-    mov eax,ecx
-    cmp edi,-1
-    jne .L3
-.L4:
-    ret`;
+export const defaultAsmContent = `L1:
+  movb $5, %ah
+  movb $5, %al
+  movl $6, %eax
+  movb $6, %al
+  movb $7, %ah
+  mov eax, dword ptr [rdi + 8 * rbx]
+  movb $8, %ah
+  movb $8, %al
+  decl %ecx
+  jne .loop`;
 
-export const resourceNames = [
-    "HWDivider",
-    "HWFPDivider",
-    "HWPort0",
-    "HWPort1",
-    "HWPort2",
-    "HWPort3",
-    "HWPort4",
-    "HWPort5",
-    "HWPort6",
-    "HWPort7",
+export const haswell: ArchitectureInfo = {
+    name: "Haswell",
+    dispatchWidth: 4,
+    resources: [
+        "HWDivider",
+        "HWFPDivider",
+        "HWPort0",
+        "HWPort1",
+        "HWPort2",
+        "HWPort3",
+        "HWPort4",
+        "HWPort5",
+        "HWPort6",
+        "HWPort7",
+    ],
+};
+
+export const generalInfo = {
+    iterations: 200,
+    instructions: 2000,
+    totalCycles: 610,
+    totalMicroOps: 2400,
+    microOpsPerCycle: 3.93,
+    ipc: 3.28,
+    blockRThroughput: 3.0,
+};
+
+export const instructions = [
+    "movb $5, %ah",
+    "movb $5, %al",
+    "movl $6, %eax",
+    "movb $6, %al",
+    "movb $7, %ah",
+    "mov eax, dword ptr [rdi + 8 * rbx]",
+    "movb $8, %ah",
+    "movb $8, %al",
+    "decl %ecx",
+    "jne .loop",
 ];
 
-export const instructionPressure: number[][] = [
-  [0, 0, 0, 0.01, 0, 0, 0, 0.5, 0.5, 0],
-  [0, 0, 0.01, 0.5, 0, 0, 0, 0.5, 0, 0],
-  [0, 0, 0.01, 0.5, 0, 0, 0, 0, 0.5, 0],
-  [0, 0, 0.5, 0, 0, 0, 0, 0.5, 0.01, 0],
-  [0, 0, 0, 0.5, 0, 0, 0, 0.01, 0.5, 0],
-  [0, 0, 0.5, 0.01, 0, 0, 0, 0.5, 0, 0],
-  [0, 0, 0.01, 0.5, 0, 0, 0, 0, 0.5, 0],
-  [0, 0, 0.5, 0, 0, 0, 0, 0.5, 0.01, 0],
-  [0, 0, 0, 0.5, 0.67, 0.67, 1.0, 0.01, 0.5, 0.67],
-  [0, 0, 1.0, 0, 0, 0, 0, 0, 0.01, 0],
+export const instructionInfo: InstructionInfo[] = [
+    {
+        uOps: 1,
+        latency: 1,
+        rThroughput: 0.25,
+        mayLoad: false,
+        mayStore: false,
+        sideFx: false,
+    },
+    {
+        uOps: 1,
+        latency: 1,
+        rThroughput: 0.25,
+        mayLoad: false,
+        mayStore: false,
+        sideFx: false,
+    },
+    {
+        uOps: 1,
+        latency: 1,
+        rThroughput: 0.25,
+        mayLoad: false,
+        mayStore: false,
+        sideFx: false,
+    },
+    {
+        uOps: 1,
+        latency: 1,
+        rThroughput: 0.25,
+        mayLoad: false,
+        mayStore: false,
+        sideFx: false,
+    },
+    {
+        uOps: 1,
+        latency: 1,
+        rThroughput: 0.25,
+        mayLoad: false,
+        mayStore: false,
+        sideFx: false,
+    },
+    {
+        uOps: 1,
+        latency: 1,
+        rThroughput: 0.25,
+        mayLoad: false,
+        mayStore: false,
+        sideFx: false,
+    },
+    {
+        uOps: 1,
+        latency: 1,
+        rThroughput: 0.25,
+        mayLoad: false,
+        mayStore: false,
+        sideFx: false,
+    },
+    {
+        uOps: 1,
+        latency: 1,
+        rThroughput: 0.25,
+        mayLoad: false,
+        mayStore: false,
+        sideFx: false,
+    },
+    {
+        uOps: 3,
+        latency: 7,
+        rThroughput: 1.0,
+        mayLoad: true,
+        mayStore: true,
+        sideFx: false,
+    },
+    {
+        uOps: 1,
+        latency: 1,
+        rThroughput: 0.5,
+        mayLoad: false,
+        mayStore: false,
+        sideFx: true,
+    },
+];
+
+export const resourcePressure: number[][] = [
+    [0, 0, 0, 0.01, 0, 0, 0, 0.5, 0.5, 0],
+    [0, 0, 0.01, 0.5, 0, 0, 0, 0.5, 0, 0],
+    [0, 0, 0.01, 0.5, 0, 0, 0, 0, 0.5, 0],
+    [0, 0, 0.5, 0, 0, 0, 0, 0.5, 0.01, 0],
+    [0, 0, 0, 0.5, 0, 0, 0, 0.01, 0.5, 0],
+    [0, 0, 0.5, 0.01, 0, 0, 0, 0.5, 0, 0],
+    [0, 0, 0.01, 0.5, 0, 0, 0, 0, 0.5, 0],
+    [0, 0, 0.5, 0, 0, 0, 0, 0.5, 0.01, 0],
+    [0, 0, 0, 0.5, 0.67, 0.67, 1.0, 0.01, 0.5, 0.67],
+    [0, 0, 1.0, 0, 0, 0, 0, 0, 0.01, 0],
 ];
 
 export const timelineEntries: TimelineEntry[] = [
@@ -108,7 +217,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 0,
         instrIndex: 0,
-        instrText: "movb $5, %ah",
         dispatchCycles: [0],
         execCycles: [1],
         execEndCycles: [2],
@@ -119,7 +227,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 0,
         instrIndex: 1,
-        instrText: "movb $5, %al",
         dispatchCycles: [0],
         execCycles: [1],
         execEndCycles: [2],
@@ -130,7 +237,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 0,
         instrIndex: 2,
-        instrText: "movl $6, %eax",
         dispatchCycles: [0],
         execCycles: [1],
         execEndCycles: [2],
@@ -141,7 +247,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 0,
         instrIndex: 3,
-        instrText: "movb $6, %al",
         dispatchCycles: [0],
         execCycles: [1],
         execEndCycles: [2],
@@ -152,7 +257,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 0,
         instrIndex: 4,
-        instrText: "movb $7, %ah",
         dispatchCycles: [1],
         execCycles: [2],
         execEndCycles: [3],
@@ -163,7 +267,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 0,
         instrIndex: 5,
-        instrText: "movl $7, %eax",
         dispatchCycles: [1],
         execCycles: [2],
         execEndCycles: [3],
@@ -174,7 +277,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 0,
         instrIndex: 6,
-        instrText: "movb $8, %ah",
         dispatchCycles: [1],
         execCycles: [2],
         execEndCycles: [3],
@@ -185,7 +287,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 0,
         instrIndex: 7,
-        instrText: "movb $8, %al",
         dispatchCycles: [1],
         execCycles: [2],
         execEndCycles: [3],
@@ -196,7 +297,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 0,
         instrIndex: 8,
-        instrText: "decl ecx",
         dispatchCycles: [1],
         execCycles: [2, 3, 4, 5, 6, 7, 8],
         execEndCycles: [9],
@@ -207,7 +307,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 0,
         instrIndex: 9,
-        instrText: "jne .loop",
         dispatchCycles: [1],
         execCycles: [9],
         execEndCycles: [10],
@@ -219,7 +318,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 1,
         instrIndex: 0,
-        instrText: "movb $5, %ah",
         dispatchCycles: [2],
         execCycles: [3],
         execEndCycles: [4],
@@ -230,7 +328,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 1,
         instrIndex: 1,
-        instrText: "movb $5, %al",
         dispatchCycles: [2],
         execCycles: [3],
         execEndCycles: [4],
@@ -241,7 +338,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 1,
         instrIndex: 2,
-        instrText: "movl $6, %eax",
         dispatchCycles: [2],
         execCycles: [3],
         execEndCycles: [4],
@@ -252,7 +348,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 1,
         instrIndex: 3,
-        instrText: "movb $6, %al",
         dispatchCycles: [2],
         execCycles: [3],
         execEndCycles: [4],
@@ -263,7 +358,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 1,
         instrIndex: 4,
-        instrText: "movb $7, %ah",
         dispatchCycles: [3],
         execCycles: [4],
         execEndCycles: [5],
@@ -274,7 +368,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 1,
         instrIndex: 5,
-        instrText: "movl $7, %eax",
         dispatchCycles: [3],
         execCycles: [4],
         execEndCycles: [5],
@@ -285,7 +378,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 1,
         instrIndex: 6,
-        instrText: "movb $8, %ah",
         dispatchCycles: [3],
         execCycles: [4],
         execEndCycles: [5],
@@ -296,7 +388,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 1,
         instrIndex: 7,
-        instrText: "movb $8, %al",
         dispatchCycles: [3],
         execCycles: [4],
         execEndCycles: [5],
@@ -307,7 +398,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 1,
         instrIndex: 8,
-        instrText: "decl ecx",
         dispatchCycles: [4],
         execCycles: [5, 6, 7, 8, 9, 10, 11],
         execEndCycles: [12],
@@ -318,7 +408,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 1,
         instrIndex: 9,
-        instrText: "jne .loop",
         dispatchCycles: [4],
         execCycles: [12],
         execEndCycles: [13],
@@ -330,7 +419,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 2,
         instrIndex: 0,
-        instrText: "movb $5, %ah",
         dispatchCycles: [5],
         execCycles: [6],
         execEndCycles: [7],
@@ -341,7 +429,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 2,
         instrIndex: 1,
-        instrText: "movb $5, %al",
         dispatchCycles: [5],
         execCycles: [6],
         execEndCycles: [7],
@@ -352,7 +439,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 2,
         instrIndex: 2,
-        instrText: "movl $6, %eax",
         dispatchCycles: [5],
         execCycles: [6],
         execEndCycles: [7],
@@ -363,7 +449,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 2,
         instrIndex: 3,
-        instrText: "movb $6, %al",
         dispatchCycles: [5],
         execCycles: [6],
         execEndCycles: [7],
@@ -374,7 +459,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 2,
         instrIndex: 4,
-        instrText: "movb $7, %ah",
         dispatchCycles: [6],
         execCycles: [7],
         execEndCycles: [8],
@@ -385,7 +469,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 2,
         instrIndex: 5,
-        instrText: "movl $7, %eax",
         dispatchCycles: [6],
         execCycles: [7],
         execEndCycles: [8],
@@ -396,7 +479,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 2,
         instrIndex: 6,
-        instrText: "movb $8, %ah",
         dispatchCycles: [6],
         execCycles: [7],
         execEndCycles: [8],
@@ -407,7 +489,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 2,
         instrIndex: 7,
-        instrText: "movb $8, %al",
         dispatchCycles: [6],
         execCycles: [7],
         execEndCycles: [8],
@@ -418,7 +499,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 2,
         instrIndex: 8,
-        instrText: "decl ecx",
         dispatchCycles: [7],
         execCycles: [8, 9, 10, 11, 12, 13, 14],
         execEndCycles: [15],
@@ -429,7 +509,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 2,
         instrIndex: 9,
-        instrText: "jne .loop",
         dispatchCycles: [7],
         execCycles: [15],
         execEndCycles: [16],
@@ -441,7 +520,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 3,
         instrIndex: 0,
-        instrText: "movb $5, %ah",
         dispatchCycles: [8],
         execCycles: [9],
         execEndCycles: [10],
@@ -452,7 +530,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 3,
         instrIndex: 1,
-        instrText: "movb $5, %al",
         dispatchCycles: [8],
         execCycles: [9],
         execEndCycles: [10],
@@ -463,7 +540,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 3,
         instrIndex: 2,
-        instrText: "movl $6, %eax",
         dispatchCycles: [8],
         execCycles: [9],
         execEndCycles: [10],
@@ -474,7 +550,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 3,
         instrIndex: 3,
-        instrText: "movb $6, %al",
         dispatchCycles: [8],
         execCycles: [9],
         execEndCycles: [10],
@@ -485,7 +560,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 3,
         instrIndex: 4,
-        instrText: "movb $7, %ah",
         dispatchCycles: [9],
         execCycles: [10],
         execEndCycles: [11],
@@ -496,7 +570,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 3,
         instrIndex: 5,
-        instrText: "movl $7, %eax",
         dispatchCycles: [9],
         execCycles: [10],
         execEndCycles: [11],
@@ -507,7 +580,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 3,
         instrIndex: 6,
-        instrText: "movb $8, %ah",
         dispatchCycles: [9],
         execCycles: [10],
         execEndCycles: [11],
@@ -518,7 +590,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 3,
         instrIndex: 7,
-        instrText: "movb $8, %al",
         dispatchCycles: [9],
         execCycles: [10],
         execEndCycles: [11],
@@ -529,7 +600,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 3,
         instrIndex: 8,
-        instrText: "decl ecx",
         dispatchCycles: [10],
         execCycles: [11, 12, 13, 14, 15, 16, 17],
         execEndCycles: [18],
@@ -540,7 +610,6 @@ export const timelineEntries: TimelineEntry[] = [
     {
         iteration: 3,
         instrIndex: 9,
-        instrText: "jne .loop",
         dispatchCycles: [10],
         execCycles: [18],
         execEndCycles: [19],

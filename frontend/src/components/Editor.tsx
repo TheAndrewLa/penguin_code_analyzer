@@ -10,7 +10,11 @@ interface EditorProps {
     readOnly?: boolean;
 }
 
-const Editor: React.FC<EditorProps> = ({
+interface EditorLockedProps {
+    instructions: string[];
+}
+
+export const Editor: React.FC<EditorProps> = ({
     value,
     onChange,
     language = "cpp",
@@ -44,4 +48,13 @@ const Editor: React.FC<EditorProps> = ({
     );
 };
 
-export default Editor;
+export const EditorLocked: React.FC<EditorLockedProps> = ({ instructions }) => {
+    return (
+        <Editor
+            value={instructions.join("\n")}
+            onChange={() => {}}
+            language="asm"
+            readOnly={true}
+        />
+    );
+};
