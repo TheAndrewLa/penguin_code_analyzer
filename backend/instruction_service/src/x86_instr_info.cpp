@@ -50,25 +50,6 @@ void InitializeLLVM() {
 
 llvm::Error MakeError(const llvm::Twine &message) { return llvm::createStringError(message); }
 
-std::string DescribeOperand(const llvm::MCOperand &operand, const llvm::MCRegisterInfo &regInfo) {
-  if (operand.isReg()) {
-    return std::string("register: ") + regInfo.getName(operand.getReg());
-  }
-  if (operand.isImm()) {
-    return "immediate: " + std::to_string(operand.getImm());
-  }
-  if (operand.isSFPImm()) {
-    return "singlie float immediate: " + std::to_string(operand.getSFPImm());
-  }
-  if (operand.isDFPImm()) {
-    return "double float immediate: " + std::to_string(operand.getDFPImm());
-  }
-  if (operand.isExpr()) {
-    return "relocatible immediate";
-  }
-  return "unknown";
-}
-
 // Special streamer used to emit only one instruction
 class OneInstructionStreamer : public llvm::MCStreamer {
 public:
@@ -171,22 +152,26 @@ X86InstrInfo::JsonResult X86InstrInfo::full(const std::string &cpu, const std::s
 }
 
 X86InstrInfo::JsonResult X86InstrInfo::analyze(const std::string &cpu, const std::string &instrText, bool full) const {
-  std::unique_ptr<llvm::MCSubtargetInfo> subtargetInfo(target_->createMCSubtargetInfo(DefaultTargetTriple, cpu, ""));
+  auto subtargetInfo =
+      std::unique_ptr<llvm::MCSubtargetInfo>(target_->createMCSubtargetInfo(DefaultTargetTriple, cpu, ""));
   Assert(subtargetInfo, "Can not create `MCSubtargetInfo`!");
+
+  const auto &schedModel = subtargetInfo->getSchedModel();
+  Assert(schedModel.hasInstrSchedModel(), "Can not get `MCSchedModel` for provided CPU!");
 
   auto ctx = llvm::MCContext(llvm::Triple(DefaultTargetTriple), asmInfo_.get(), regInfo_.get(), subtargetInfo.get());
 
-  std::unique_ptr<llvm::MemoryBuffer> buffer(llvm::MemoryBuffer::getMemBuffer(instrText, "input.s", false));
+  auto buffer = std::unique_ptr<llvm::MemoryBuffer>(llvm::MemoryBuffer::getMemBuffer(instrText, "input.s", false));
 
   llvm::SourceMgr sourceMgr;
   sourceMgr.AddNewSourceBuffer(std::move(buffer), llvm::SMLoc());
 
   auto streamer = OneInstructionStreamer(ctx);
 
-  std::unique_ptr<llvm::MCAsmParser> parser(llvm::createMCAsmParser(sourceMgr, ctx, streamer, *asmInfo_));
+  auto parser = std::unique_ptr<llvm::MCAsmParser>(llvm::createMCAsmParser(sourceMgr, ctx, streamer, *asmInfo_));
   Assert(parser, "Can not create `MCAsmParser`!");
 
-  std::unique_ptr<llvm::MCTargetAsmParser> targetParser(
+  auto targetParser = std::unique_ptr<llvm::MCTargetAsmParser>(
       target_->createMCAsmParser(*subtargetInfo, *parser, *instrInfo_, llvm::MCTargetOptions()));
   Assert(targetParser, "Can not create `MCTargetAsmParser`!");
 
@@ -194,8 +179,6 @@ X86InstrInfo::JsonResult X86InstrInfo::analyze(const std::string &cpu, const std
   parser->Run(true);
 
   Assert(streamer.hasInstruction(), "Can not parse instruction");
-
-  const auto &schedModel = subtargetInfo->getSchedModel();
 
   const auto &instr = streamer.getInstruction();
   const auto &instrDesc = instrInfo_->get(instr.getOpcode());

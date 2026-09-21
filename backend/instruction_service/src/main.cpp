@@ -1,21 +1,22 @@
 #include <drogon/drogon.h>
-#include <json/json.h>
 
 #include <cstdint>
 #include <iostream>
 #include <memory>
-#include <sstream>
 #include <string>
 #include <thread>
 
 #include "x86_instr_info.hpp"
 
-#ifndef PORT
-#define PORT (8888)
-#endif
-
 namespace {
-drogon::HttpResponsePtr MakeJsonError(const std::string &message, drogon::HttpStatusCode code = drogon::k200OK) {
+constexpr auto DefaultPort = std::uint16_t(8080);
+
+struct Params {
+  Json::String cpu;
+  Json::String instruction;
+};
+
+drogon::HttpResponsePtr MakeJsonError(const std::string &message, drogon::HttpStatusCode code) {
   Json::Value body;
   body["error"] = message;
 
@@ -25,49 +26,57 @@ drogon::HttpResponsePtr MakeJsonError(const std::string &message, drogon::HttpSt
   return response;
 }
 
-std::shared_ptr<Json::Value> GetJsonBody(const drogon::HttpRequestPtr &req) {
+llvm::Expected<Json::Value> GetJsonBody(const drogon::HttpRequestPtr &req) {
   auto json = req->getJsonObject();
 
   if (json) {
-    return json;
+    return *json;
   }
+
+  const auto body = Json::String(req->getBody());
+  auto stream = Json::IStringStream(body);
 
   Json::CharReaderBuilder builder;
-  Json::Value parsed;
-  std::string errors;
+  Json::Value root;
+  Json::String errors;
 
-  const auto body = std::string{req->getBody()};
-  std::istringstream stream(body);
-
-  if (Json::parseFromStream(builder, stream, &parsed, &errors)) {
-    return std::make_shared<Json::Value>(parsed);
+  if (Json::parseFromStream(builder, stream, &root, &errors)) {
+    return root;
   }
 
-  return nullptr;
+  return llvm::createStringError("Can not parse JSON object!");
 }
 
-llvm::Expected<std::pair<std::string, std::string>> ExtractReqBody(const Json::Value &json) {
-  std::string cpu;
-  std::string instruction;
+llvm::Expected<Params> ExtractParams(const Json::Value &object) {
+  Json::String cpu;
+  Json::String instruction;
 
-  if (json.isMember("cpu") && json["cpu"].isString()) {
-    cpu = json["cpu"].asString();
+  if (object.isMember("cpu") && object["cpu"].isString()) {
+    cpu = object["cpu"].asString();
   } else {
     return llvm::createStringError("Field 'cpu' is not set!");
   }
 
-  if (json.isMember("instruction") && json["instruction"].isString()) {
-    instruction = json["instruction"].asString();
+  if (object.isMember("instruction") && object["instruction"].isString()) {
+    instruction = object["instruction"].asString();
   } else {
     return llvm::createStringError("Microarchitecture name must not be empty");
   }
 
-  return std::pair<std::string, std::string>{cpu, instruction};
+  return Params{cpu, instruction};
 }
 } // namespace
 
 int main(int argc, char **argv) {
-  const auto port = std::uint16_t(PORT);
+  auto port = DefaultPort;
+
+  for (int i = 1; i < argc; ++i) {
+    const auto arg = std::string(argv[i]);
+
+    if (arg.rfind("--port=", 0) == 0) {
+      port = std::stoi(arg.substr(7));
+    }
+  }
 
   auto service = X86InstrInfo{};
   auto &app = drogon::app();
@@ -91,21 +100,21 @@ int main(int argc, char **argv) {
         auto json = GetJsonBody(req);
 
         if (!json) {
-          callback(MakeJsonError("JSON request body required", drogon::k400BadRequest));
+          callback(MakeJsonError(llvm::toString(json.takeError()), drogon::k400BadRequest));
           return;
         }
 
-        auto analyzeReq = ExtractReqBody(*json);
+        auto analyzeReq = ExtractParams(*json);
 
         if (!analyzeReq) {
           callback(MakeJsonError(llvm::toString(analyzeReq.takeError()), drogon::k400BadRequest));
           return;
         }
 
-        auto briefResult = service.brief(analyzeReq->first, analyzeReq->second);
+        auto briefResult = service.brief(analyzeReq->cpu, analyzeReq->instruction);
 
         if (!briefResult) {
-          callback(MakeJsonError(llvm::toString(briefResult.takeError())));
+          callback(MakeJsonError(llvm::toString(briefResult.takeError()), drogon::k400BadRequest));
         } else {
           callback(drogon::HttpResponse::newHttpJsonResponse(*briefResult));
         }
@@ -118,21 +127,21 @@ int main(int argc, char **argv) {
         auto json = GetJsonBody(req);
 
         if (!json) {
-          callback(MakeJsonError("JSON request body required", drogon::k400BadRequest));
+          callback(MakeJsonError(llvm::toString(json.takeError()), drogon::k400BadRequest));
           return;
         }
 
-        auto reqBody = ExtractReqBody(*json);
+        auto reqBody = ExtractParams(*json);
 
         if (!reqBody) {
           callback(MakeJsonError(llvm::toString(reqBody.takeError()), drogon::k400BadRequest));
           return;
         }
 
-        auto fullResult = service.brief(reqBody->first, reqBody->second);
+        auto fullResult = service.full(reqBody->cpu, reqBody->instruction);
 
         if (!fullResult) {
-          callback(MakeJsonError(llvm::toString(fullResult.takeError())));
+          callback(MakeJsonError(llvm::toString(fullResult.takeError()), drogon::k400BadRequest));
         } else {
           callback(drogon::HttpResponse::newHttpJsonResponse(*fullResult));
         }
