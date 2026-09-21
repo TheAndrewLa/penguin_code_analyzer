@@ -1,6 +1,5 @@
-# syntax=docker/dockerfile:1
-
-FROM ubuntu:24.04 AS deps
+# STAGE 1: Build
+FROM ubuntu:24.04 AS builder
 
 ENV DEBIAN_FRONTEND=noninteractive
 
@@ -9,61 +8,68 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     cmake \
     git \
     ca-certificates \
-    curl \
+    pkg-config \
+    llvm-19-dev \
+    libclang-19-dev \
+    libzstd-dev \
     libssl-dev \
-    zlib1g-dev \
     libjsoncpp-dev \
     uuid-dev \
+    zlib1g-dev \
+    libc-ares-dev \
     libbrotli-dev \
-    llvm-18-dev \
-    llvm-18-tools \
     && rm -rf /var/lib/apt/lists/*
 
-FROM deps AS drogon-builder
-
-ARG DROGON_VERSION=v1.9.7
-
+ARG DROGON_VERSION=v1.9.8
+WORKDIR /opt
 RUN git clone --depth 1 --branch ${DROGON_VERSION} \
-    https://github.com/drogonframework/drogon.git /opt/drogon && \
-    cd /opt/drogon && \
+    https://github.com/drogonframework/drogon.git && \
+    cd drogon && \
     git submodule update --init --recursive && \
-    cmake -B build \
+    cmake -S . -B build \
     -DCMAKE_BUILD_TYPE=Release \
     -DBUILD_EXAMPLES=OFF \
     -DBUILD_CTL=OFF \
-    -DBUILD_ORM=OFF \
-    -DBUILD_DROGON_SHARED=OFF \
-    -DBUILD_TRANTOR_SHARED=OFF && \
+    -DBUILD_TESTING=OFF \
+    -DBUILD_DOC=OFF \
+    -DCMAKE_INSTALL_PREFIX=/usr/local && \
     cmake --build build -j"$(nproc)" && \
-    cmake --install build
-
-FROM deps AS build
-
-COPY --from=drogon-builder /usr/local /usr/local
+    cmake --install build && \
+    ldconfig
 
 WORKDIR /app
-
-COPY . .
-
-ENV LLVM_DIR=/usr/lib/llvm-18/lib/cmake/llvm
-
-RUN cmake -B build \
+COPY CMakeLists.txt ./
+COPY src ./src
+RUN cmake -S . -B build \
     -DCMAKE_BUILD_TYPE=Release \
-    -DCMAKE_PREFIX_PATH="/usr/lib/llvm-18;/usr/local" && \
+    -DCMAKE_INSTALL_PREFIX=/usr/local && \
     cmake --build build -j"$(nproc)"
 
-FROM build AS test
+# STAGE 2: Runtime
+FROM ubuntu:24.04 AS runtime
+
+ENV DEBIAN_FRONTEND=noninteractive
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
-    curl \
-    jq \
+    libssl3t64 \
+    libjsoncpp25 \
+    libuuid1 \
+    zlib1g \
+    libc-ares2 \
+    libbrotli1 \
+    libzstd1 \
+    libllvm19 \
     && rm -rf /var/lib/apt/lists/*
 
-RUN ctest --test-dir build --output-on-failure
+COPY --from=builder /usr/local/lib/libdrogon*.so* /usr/local/lib/
+RUN ldconfig
 
-FROM build AS runtime
+COPY --from=builder /app/build/service /usr/local/bin/service
+
+RUN useradd --system --create-home --uid 10001 appuser
+USER appuser
 
 EXPOSE 8080
 
-ENTRYPOINT ["/app/build/instruction_service"]
-CMD ["--port=8080"]
+ENTRYPOINT ["/usr/local/bin/service"]
+CMD ["--port", "8080"]

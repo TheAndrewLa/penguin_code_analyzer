@@ -1,0 +1,9 @@
+build/
+cmake-build-*/
+
+*.o
+*.a
+*.so
+
+.git/
+.gitignore
