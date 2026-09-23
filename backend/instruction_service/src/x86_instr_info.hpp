@@ -11,7 +11,6 @@ class Target;
 class MCInstrInfo;
 class MCRegisterInfo;
 class MCAsmInfo;
-class MCSubtargetInfo;
 } // namespace llvm
 
 class X86InstrInfo {
