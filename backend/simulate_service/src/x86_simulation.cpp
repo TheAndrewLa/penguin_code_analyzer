@@ -126,19 +126,18 @@ X86Simulation::X86Simulation() {
 
 X86Simulation::~X86Simulation() = default;
 
-std::string X86Simulation::apply(const std::string &cpu, const std::vector<std::string> &instructions) const {
-  std::string token = makeToken();
-
-  SimulationData &data = data_[token];
+std::string X86Simulation::start(const std::string &cpu, const std::vector<std::string> &instructions) {
+  const auto session = newSession();
+  SimulationData &data = results_[session];
 
   try {
     auto sti = std::unique_ptr<llvm::MCSubtargetInfo>(target_->createMCSubtargetInfo(DefaultTargetTriple, cpu, ""));
     Assert(sti, "Failed to create `MCSubtargetInfo`!");
     Assert(sti->getSchedModel().hasInstrSchedModel(), "No scheduling information for CPU!");
 
-    auto insts = parseInstructions(*sti, instructions);
-    auto lowered = lowerInstructions(*sti, insts);
-    unsigned totalCycles = runPipeline(*sti, lowered);
+    auto insts = parse(*sti, instructions);
+    auto lowered = lower(*sti, insts);
+    unsigned totalCycles = run(*sti, lowered);
     data = collectResults(*sti, insts, lowered, totalCycles, instructions);
     data.success = true;
   } catch (const AnalyzeError &error) {
@@ -149,11 +148,13 @@ std::string X86Simulation::apply(const std::string &cpu, const std::vector<std::
     data.error = "Unknown simulation error";
   }
 
-  return token;
+  return session;
 }
 
-std::vector<llvm::MCInst> X86Simulation::parseInstructions(const llvm::MCSubtargetInfo &subtargetInfo,
-                                                           const std::vector<std::string> &instructions) const {
+void X86Simulation::end(const std::string &session) { results_.erase(session); }
+
+std::vector<llvm::MCInst> X86Simulation::parse(const llvm::MCSubtargetInfo &subtargetInfo,
+                                               const std::vector<std::string> &instructions) const {
   llvm::SourceMgr sourceMgr;
   std::string program;
 
@@ -185,8 +186,7 @@ std::vector<llvm::MCInst> X86Simulation::parseInstructions(const llvm::MCSubtarg
 }
 
 std::vector<std::unique_ptr<llvm::mca::Instruction>>
-X86Simulation::lowerInstructions(const llvm::MCSubtargetInfo &subtargetInfo,
-                                 const std::vector<llvm::MCInst> &instructions) const {
+X86Simulation::lower(const llvm::MCSubtargetInfo &subtargetInfo, const std::vector<llvm::MCInst> &instructions) const {
   auto instrAnalysis = std::unique_ptr<llvm::MCInstrAnalysis>(target_->createMCInstrAnalysis(instrInfo_.get()));
 
   auto instrumentMgr = llvm::mca::InstrumentManager(subtargetInfo, *instrInfo_);
@@ -207,8 +207,8 @@ X86Simulation::lowerInstructions(const llvm::MCSubtargetInfo &subtargetInfo,
   return lowered;
 }
 
-unsigned X86Simulation::runPipeline(const llvm::MCSubtargetInfo &subtargetInfo,
-                                    const std::vector<std::unique_ptr<llvm::mca::Instruction>> &lowered) const {
+unsigned X86Simulation::run(const llvm::MCSubtargetInfo &subtargetInfo,
+                            const std::vector<std::unique_ptr<llvm::mca::Instruction>> &lowered) const {
   const auto &schedModel = subtargetInfo.getSchedModel();
   const auto dispatchWidth = getDispatchWidth(schedModel);
 
@@ -305,8 +305,8 @@ X86Simulation::collectResults(const llvm::MCSubtargetInfo &subtargetInfo, const 
 }
 
 X86Simulation::JsonResult X86Simulation::getGeneralResults(const std::string &token) {
-  auto iter = data_.find(token);
-  if (iter == data_.end()) {
+  auto iter = results_.find(token);
+  if (iter == results_.end()) {
     return MakeError("Token not found");
   }
   if (!iter->second.success) {
@@ -327,8 +327,8 @@ X86Simulation::JsonResult X86Simulation::getGeneralResults(const std::string &to
 }
 
 X86Simulation::JsonResult X86Simulation::getInstructionInfo(const std::string &token) {
-  auto iter = data_.find(token);
-  if (iter == data_.end()) {
+  auto iter = results_.find(token);
+  if (iter == results_.end()) {
     return MakeError("Token not found");
   }
   if (!iter->second.success) {
@@ -352,8 +352,8 @@ X86Simulation::JsonResult X86Simulation::getInstructionInfo(const std::string &t
 }
 
 X86Simulation::JsonResult X86Simulation::getResourceUsage(const std::string &token) {
-  auto iter = data_.find(token);
-  if (iter == data_.end()) {
+  auto iter = results_.find(token);
+  if (iter == results_.end()) {
     return MakeError("Token not found");
   }
   if (!iter->second.success) {
@@ -370,7 +370,7 @@ X86Simulation::JsonResult X86Simulation::getResourceUsage(const std::string &tok
   return result;
 }
 
-std::string X86Simulation::makeToken() {
+std::string X86Simulation::newSession() {
   const auto time = std::chrono::steady_clock::now().time_since_epoch();
   return std::to_string(time.count());
 }

@@ -60,7 +60,8 @@ public:
   X86Simulation &operator=(const X86Simulation &) = delete;
   X86Simulation &operator=(X86Simulation &&) = delete;
 
-  std::string apply(const std::string &cpu, const std::vector<std::string> &instructions) const;
+  std::string start(const std::string &cpu, const std::vector<std::string> &instructions);
+  void end(const std::string &session);
 
   JsonResult getGeneralResults(const std::string &token);
   JsonResult getInstructionInfo(const std::string &token);
@@ -72,8 +73,6 @@ private:
   static constexpr auto DefaultIterations = 100;
   static constexpr auto DefaultCallLatency = 100;
 
-  static std::string makeToken();
-
   struct SimulationData {
     GeneralInfo general{};
     std::map<std::string, InstructionInfo> instructionInfo;
@@ -82,19 +81,21 @@ private:
     bool success = false;
   };
 
-  std::vector<llvm::MCInst> parseInstructions(const llvm::MCSubtargetInfo &subtargetInfo,
-                                              const std::vector<std::string> &instructions) const;
-
-  std::vector<std::unique_ptr<llvm::mca::Instruction>>
-  lowerInstructions(const llvm::MCSubtargetInfo &subtargetInfo, const std::vector<llvm::MCInst> &instructions) const;
-
-  unsigned runPipeline(const llvm::MCSubtargetInfo &subtargetInfo,
-                       const std::vector<std::unique_ptr<llvm::mca::Instruction>> &lowered) const;
+  static std::string newSession();
 
   static SimulationData collectResults(const llvm::MCSubtargetInfo &subtargetInfo,
                                        const std::vector<llvm::MCInst> &instructions,
                                        const std::vector<std::unique_ptr<llvm::mca::Instruction>> &lowered,
                                        unsigned totalCycles, const std::vector<std::string> &instructionStrings);
+
+  std::vector<llvm::MCInst> parse(const llvm::MCSubtargetInfo &subtargetInfo,
+                                  const std::vector<std::string> &instructions) const;
+
+  std::vector<std::unique_ptr<llvm::mca::Instruction>> lower(const llvm::MCSubtargetInfo &subtargetInfo,
+                                                             const std::vector<llvm::MCInst> &instructions) const;
+
+  unsigned run(const llvm::MCSubtargetInfo &subtargetInfo,
+               const std::vector<std::unique_ptr<llvm::mca::Instruction>> &lowered) const;
 
   const llvm::Target *target_;
 
@@ -102,7 +103,7 @@ private:
   std::unique_ptr<llvm::MCAsmInfo> asmInfo_;
   std::unique_ptr<llvm::MCInstrInfo> instrInfo_;
 
-  mutable std::map<std::string, SimulationData> data_;
+  std::unordered_map<std::string, SimulationData> results_;
 };
 
 #endif // X86_SIMULATION_HPP
