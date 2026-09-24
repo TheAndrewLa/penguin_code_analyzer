@@ -6,6 +6,7 @@
 #include <llvm/MC/MCContext.h>
 #include <llvm/MC/MCInstrAnalysis.h>
 #include <llvm/MC/MCInstrInfo.h>
+#include <llvm/MC/MCObjectFileInfo.h>
 #include <llvm/MC/MCParser/MCAsmParser.h>
 #include <llvm/MC/MCParser/MCTargetAsmParser.h>
 #include <llvm/MC/MCRegisterInfo.h>
@@ -18,6 +19,7 @@
 
 #include <llvm/MCA/Context.h>
 #include <llvm/MCA/CustomBehaviour.h>
+#include <llvm/MCA/HWEventListener.h>
 #include <llvm/MCA/InstrBuilder.h>
 #include <llvm/MCA/Instruction.h>
 #include <llvm/MCA/Pipeline.h>
@@ -29,7 +31,10 @@
 #include <llvm/Support/SourceMgr.h>
 #include <llvm/Support/TargetSelect.h>
 
+#include <algorithm>
 #include <chrono>
+#include <cstddef>
+#include <cstdint>
 #include <map>
 #include <memory>
 #include <mutex>
@@ -68,10 +73,9 @@ template <typename T> void Assert(T &&value, const std::string &message) {
   }
 }
 
-// Streamer that collects every emitted instruction instead of producing output.
-class CollectStreamer : public llvm::MCStreamer {
+class InstructionStreamer : public llvm::MCStreamer {
 public:
-  explicit CollectStreamer(llvm::MCContext &ctx) : MCStreamer(ctx) {
+  explicit InstructionStreamer(llvm::MCContext &ctx) : MCStreamer(ctx) {
     auto *text = ctx.getELFSection(".text", llvm::ELF::SHT_PROGBITS, llvm::ELF::SHF_ALLOC | llvm::ELF::SHF_EXECINSTR);
     switchSection(text);
   }
@@ -96,6 +100,54 @@ unsigned getDispatchWidth(const llvm::MCSchedModel &model) {
   const auto width = model.IssueWidth;
   return (width == 0) ? 1 : width;
 }
+
+// Records, for every instruction instance, the cycle in which it was
+// dispatched, issued, executed and retired.
+class TimelineRecorder : public llvm::mca::HWEventListener {
+public:
+  struct Stamps {
+    int dispatch = -1;
+    int ready = -1;
+    int issued = -1;
+    int executed = -1;
+    int retired = -1;
+  };
+
+  void onEvent(const llvm::mca::HWInstructionEvent &event) override {
+    const unsigned index = event.IR.getSourceIndex();
+    auto &stamp = stamps_[index];
+
+    switch (event.Type) {
+    case llvm::mca::HWInstructionEvent::Dispatched:
+      if (stamp.dispatch < 0) {
+        stamp.dispatch = currentCycle_;
+      }
+      break;
+    case llvm::mca::HWInstructionEvent::Ready:
+      stamp.ready = currentCycle_;
+      break;
+    case llvm::mca::HWInstructionEvent::Issued:
+      stamp.issued = currentCycle_;
+      break;
+    case llvm::mca::HWInstructionEvent::Executed:
+      stamp.executed = currentCycle_;
+      break;
+    case llvm::mca::HWInstructionEvent::Retired:
+      stamp.retired = currentCycle_;
+      break;
+    default:
+      break;
+    }
+  }
+
+  void onCycleEnd() override { ++currentCycle_; }
+
+  const std::map<unsigned, Stamps> &stamps() const { return stamps_; }
+
+private:
+  unsigned currentCycle_ = 0;
+  std::map<unsigned, Stamps> stamps_;
+};
 } // namespace
 
 X86Simulation::X86Simulation() {
@@ -128,17 +180,19 @@ X86Simulation::~X86Simulation() = default;
 
 std::string X86Simulation::start(const std::string &cpu, const std::vector<std::string> &instructions) {
   const auto session = newSession();
-  SimulationData &data = results_[session];
+  Simulation &data = results_[session];
 
   try {
-    auto sti = std::unique_ptr<llvm::MCSubtargetInfo>(target_->createMCSubtargetInfo(DefaultTargetTriple, cpu, ""));
-    Assert(sti, "Failed to create `MCSubtargetInfo`!");
-    Assert(sti->getSchedModel().hasInstrSchedModel(), "No scheduling information for CPU!");
+    auto subtargetInfo =
+        std::unique_ptr<llvm::MCSubtargetInfo>(target_->createMCSubtargetInfo(DefaultTargetTriple, cpu, ""));
 
-    auto insts = parse(*sti, instructions);
-    auto lowered = lower(*sti, insts);
-    unsigned totalCycles = run(*sti, lowered);
-    data = collectResults(*sti, insts, lowered, totalCycles, instructions);
+    Assert(subtargetInfo, "Failed to create `MCSubtargetInfo`!");
+    Assert(subtargetInfo->getSchedModel().hasInstrSchedModel(), "No scheduling information for CPU!");
+
+    auto parsed = parse(*subtargetInfo, instructions);
+    auto lowered = lower(*subtargetInfo, parsed);
+    unsigned totalCycles = run(*subtargetInfo, lowered.instructions, data.timeline);
+    data = collectResults(*subtargetInfo, parsed, lowered.instructions, totalCycles);
     data.success = true;
   } catch (const AnalyzeError &error) {
     data.success = false;
@@ -153,162 +207,13 @@ std::string X86Simulation::start(const std::string &cpu, const std::vector<std::
 
 void X86Simulation::end(const std::string &session) { results_.erase(session); }
 
-std::vector<llvm::MCInst> X86Simulation::parse(const llvm::MCSubtargetInfo &subtargetInfo,
-                                               const std::vector<std::string> &instructions) const {
-  llvm::SourceMgr sourceMgr;
-  std::string program;
+X86Simulation::JsonResult X86Simulation::getGeneralResults(const std::string &session) {
+  auto iter = results_.find(session);
 
-  std::for_each(instructions.cbegin(), instructions.cend(), [&program](const auto &instr) {
-    program += instr;
-    program += '\n';
-  });
-
-  sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(program), llvm::SMLoc());
-
-  auto ctx = llvm::MCContext(llvm::Triple(DefaultTargetTriple), asmInfo_.get(), regInfo_.get(), &subtargetInfo);
-
-  auto streamer = CollectStreamer(ctx);
-  auto parser = std::unique_ptr<llvm::MCAsmParser>(llvm::createMCAsmParser(sourceMgr, ctx, streamer, *asmInfo_));
-
-  Assert(parser, "Failed to create `MCAsmParser`!");
-
-  auto targetParser = std::unique_ptr<llvm::MCTargetAsmParser>(
-      target_->createMCAsmParser(subtargetInfo, *parser, *instrInfo_, llvm::MCTargetOptions()));
-
-  Assert(targetParser, "Failed to create `MCTargetAsmParser`!");
-
-  parser->setTargetParser(*targetParser);
-  parser->Run(true);
-
-  Assert(streamer.hasInstructions(), "Failed to parse instructions!");
-
-  return streamer.instructions();
-}
-
-std::vector<std::unique_ptr<llvm::mca::Instruction>>
-X86Simulation::lower(const llvm::MCSubtargetInfo &subtargetInfo, const std::vector<llvm::MCInst> &instructions) const {
-  auto instrAnalysis = std::unique_ptr<llvm::MCInstrAnalysis>(target_->createMCInstrAnalysis(instrInfo_.get()));
-
-  auto instrumentMgr = llvm::mca::InstrumentManager(subtargetInfo, *instrInfo_);
-  auto instrBuilder = llvm::mca::InstrBuilder(subtargetInfo, *instrInfo_, *regInfo_, instrAnalysis.get(), instrumentMgr,
-                                              DefaultCallLatency);
-
-  std::vector<std::unique_ptr<llvm::mca::Instruction>> lowered;
-  llvm::SmallVector<llvm::mca::Instrument *> instruments;
-
-  lowered.reserve(instructions.size());
-
-  for (const auto &instr : instructions) {
-    auto loweredInstr = instrBuilder.createInstruction(instr, instruments);
-    Assert(loweredInstr, "Failed to lower instruction!");
-    lowered.emplace_back(std::move(*loweredInstr));
-  }
-
-  return lowered;
-}
-
-unsigned X86Simulation::run(const llvm::MCSubtargetInfo &subtargetInfo,
-                            const std::vector<std::unique_ptr<llvm::mca::Instruction>> &lowered) const {
-  const auto &schedModel = subtargetInfo.getSchedModel();
-  const auto dispatchWidth = getDispatchWidth(schedModel);
-
-  llvm::mca::CircularSourceMgr src(lowered, DefaultIterations);
-
-  llvm::mca::PipelineOptions options(/*MicroOpQueueSize=*/0, /*DecodersThroughput=*/0,
-                                     /*DispatchWidth=*/dispatchWidth, /*RegisterFileSize=*/0,
-                                     /*LoadQueueSize=*/0, /*StoreQueueSize=*/0,
-                                     /*AssumeNoAlias=*/true);
-
-  auto ctx = llvm::mca::Context(*regInfo_, subtargetInfo);
-  auto customBehaviour = std::make_unique<llvm::mca::CustomBehaviour>(subtargetInfo, src, *instrInfo_);
-  auto pipeline = ctx.createDefaultPipeline(options, src, *customBehaviour);
-  auto cycles = pipeline->run();
-
-  Assert(cycles, "Failed to run pipeline");
-
-  return *cycles;
-}
-
-X86Simulation::SimulationData
-X86Simulation::collectResults(const llvm::MCSubtargetInfo &subtargetInfo, const std::vector<llvm::MCInst> &instructions,
-                              const std::vector<std::unique_ptr<llvm::mca::Instruction>> &lowered, unsigned totalCycles,
-                              const std::vector<std::string> &instructionStrings) {
-  const auto &schedModel = subtargetInfo.getSchedModel();
-  const auto dispatchWidth = getDispatchWidth(schedModel);
-
-  llvm::SmallVector<uint64_t, 8> procResourceMasks;
-  llvm::SmallVector<unsigned, 8> resIdx2ProcResID;
-
-  procResourceMasks.resize(schedModel.getNumProcResourceKinds());
-  resIdx2ProcResID.resize(schedModel.getNumProcResourceKinds(), 0);
-
-  llvm::mca::computeProcResourceMasks(schedModel, procResourceMasks);
-
-  auto resourceKinds = schedModel.getNumProcResourceKinds();
-
-  for (unsigned i = 1; i < resourceKinds; ++i) {
-    resIdx2ProcResID[llvm::mca::getResourceStateIndex(procResourceMasks[i])] = i;
-  }
-
-  llvm::SmallVector<unsigned, 8> blockResourceUsage;
-  blockResourceUsage.resize(schedModel.getNumProcResourceKinds(), 0);
-
-  auto blockMicroOps = unsigned(0);
-
-  SimulationData data;
-
-  data.general.iterations = DefaultIterations;
-  data.general.instructions = instructions.size();
-  data.general.totalCycles = totalCycles;
-
-  for (size_t i = 0; i < instructions.size(); ++i) {
-    const auto &instr = lowered[i];
-    const auto &desc = instr->getDesc();
-    const auto *schedClassDesc = schedModel.getSchedClassDesc(desc.SchedClassID);
-
-    Assert(schedClassDesc != nullptr, "Can not create sched class desc for instruction!");
-
-    auto info = InstructionInfo{};
-    info.uOps = desc.NumMicroOps;
-    info.latency = llvm::MCSchedModel::computeInstrLatency(subtargetInfo, *schedClassDesc);
-    info.rThroughput = llvm::MCSchedModel::getReciprocalThroughput(subtargetInfo, *schedClassDesc);
-    info.mayLoad = instr->getMayLoad();
-    info.mayStore = instr->getMayStore();
-    info.sideFx = instr->getHasSideEffects();
-
-    ResourceUsage usage;
-    usage.assign(schedModel.getNumProcResourceKinds(), 0.0F);
-    for (const auto &resource : desc.Resources) {
-      unsigned idx = resIdx2ProcResID[llvm::mca::getResourceStateIndex(resource.first)];
-      usage[idx] = resource.second.size();
-      blockResourceUsage[idx] += resource.second.size();
-    }
-    blockMicroOps += desc.NumMicroOps;
-
-    const auto &key = (i < instructionStrings.size()) ? instructionStrings[i] : std::to_string(i);
-
-    data.instructionInfo[key] = info;
-    data.resourceUsage[key] = std::move(usage);
-  }
-
-  data.general.totalMicroOps = blockMicroOps * DefaultIterations;
-  data.general.uOpsPerCycle =
-      (totalCycles > 0) ? static_cast<float>(data.general.totalMicroOps) / static_cast<float>(totalCycles) : 0.0F;
-  data.general.instructionsPerCycle =
-      (totalCycles > 0)
-          ? static_cast<float>(data.general.instructions * DefaultIterations) / static_cast<float>(totalCycles)
-          : 0.0F;
-  data.general.blockRThroughput =
-      llvm::mca::computeBlockRThroughput(schedModel, dispatchWidth, blockMicroOps, blockResourceUsage);
-
-  return data;
-}
-
-X86Simulation::JsonResult X86Simulation::getGeneralResults(const std::string &token) {
-  auto iter = results_.find(token);
   if (iter == results_.end()) {
-    return MakeError("Token not found");
+    return MakeError("Can not find general info!");
   }
+
   if (!iter->second.success) {
     return MakeError(iter->second.error);
   }
@@ -326,51 +231,303 @@ X86Simulation::JsonResult X86Simulation::getGeneralResults(const std::string &to
   return result;
 }
 
-X86Simulation::JsonResult X86Simulation::getInstructionInfo(const std::string &token) {
-  auto iter = results_.find(token);
+X86Simulation::JsonResult X86Simulation::getInstructionInfo(const std::string &session) {
+  auto iter = results_.find(session);
+
   if (iter == results_.end()) {
-    return MakeError("Token not found");
+    return MakeError("Can not find instruction info!");
   }
+
   if (!iter->second.success) {
     return MakeError(iter->second.error);
   }
 
-  auto result = Json::Value(Json::objectValue);
+  auto result = Json::Value(Json::arrayValue);
 
-  for (const auto &[key, info] : iter->second.instructionInfo) {
+  for (const auto &info : iter->second.instructionInfo) {
     auto entry = Json::Value(Json::objectValue);
+    entry["instrIndex"] = info.instrIndex;
     entry["uOps"] = info.uOps;
     entry["latency"] = info.latency;
     entry["rThroughput"] = info.rThroughput;
     entry["mayLoad"] = info.mayLoad;
     entry["mayStore"] = info.mayStore;
     entry["sideFx"] = info.sideFx;
-    result[key] = std::move(entry);
+    result.append(std::move(entry));
   }
 
   return result;
 }
 
-X86Simulation::JsonResult X86Simulation::getResourceUsage(const std::string &token) {
-  auto iter = results_.find(token);
+X86Simulation::JsonResult X86Simulation::getResourceUsage(const std::string &session) {
+  auto iter = results_.find(session);
+
   if (iter == results_.end()) {
-    return MakeError("Token not found");
+    return MakeError("Can not find resource usage!");
   }
+
   if (!iter->second.success) {
     return MakeError(iter->second.error);
   }
 
-  auto result = Json::Value(Json::objectValue);
+  const auto &resourceUsage = iter->second.resourceUsage;
 
-  for (const auto &[key, usage] : iter->second.resourceUsage) {
-    auto array = Json::Value(Json::arrayValue);
-    std::for_each(usage.begin(), usage.end(), [&array](const auto value) { array.append(value); });
-    result[key] = array;
+  auto result = Json::Value(Json::objectValue);
+  auto resources = Json::Value(Json::arrayValue);
+  std::for_each(resourceUsage.resourceNames.begin(), resourceUsage.resourceNames.end(),
+                [&resources](const auto &name) { resources.append(name); });
+
+  result["resources"] = std::move(resources);
+  result["dispatchWidth"] = resourceUsage.dispatchWidth;
+
+  auto usage = Json::Value(Json::arrayValue);
+  for (const auto &entry : resourceUsage.usageEntries) {
+    auto item = Json::Value(Json::objectValue);
+    item["instrIndex"] = entry.instrIndex;
+
+    auto cycles = Json::Value(Json::arrayValue);
+    std::for_each(entry.resources.begin(), entry.resources.end(),
+                  [&cycles](const auto &value) { cycles.append(value); });
+
+    item["cycles"] = std::move(cycles);
+
+    usage.append(std::move(item));
   }
+  result["usage"] = std::move(usage);
+
+  return result;
+}
+
+X86Simulation::JsonResult X86Simulation::getTimeline(const std::string &session) {
+  auto iter = results_.find(session);
+
+  if (iter == results_.end()) {
+    return MakeError("Can not find timeline!");
+  }
+
+  if (!iter->second.success) {
+    return MakeError(iter->second.error);
+  }
+
+  auto result = Json::Value(Json::arrayValue);
+
+  for (const auto &entry : iter->second.timeline) {
+    auto item = Json::Value(Json::objectValue);
+    item["iteration"] = entry.iteration;
+    item["instrIndex"] = entry.instrIndex;
+
+    auto append = [&item](const char *key, const llvm::SmallVector<std::size_t> &values) {
+      auto array = Json::Value(Json::arrayValue);
+      for (auto value : values) {
+        array.append(value);
+      }
+      item[key] = std::move(array);
+    };
+
+    append("dispatchCycles", entry.dispatchCycles);
+    append("waitQueueCycles", entry.waitQueueCycles);
+    append("executeCycles", entry.executeCycles);
+    append("executeEndCycles", entry.executeEndCycles);
+    append("waitRetireCycles", entry.waitRetireCycles);
+    append("retireCycles", entry.retireCycles);
+
+    result.append(std::move(item));
+  }
+
   return result;
 }
 
 std::string X86Simulation::newSession() {
   const auto time = std::chrono::steady_clock::now().time_since_epoch();
   return std::to_string(time.count());
+}
+
+X86Simulation::Simulation X86Simulation::collectResults(const llvm::MCSubtargetInfo &subtargetInfo,
+                                                        const ParsedInstructions &instructions,
+                                                        const LoweredInstructions &lowered, unsigned totalCycles) {
+  Assert(totalCycles > 0, "Simulation produced no cycles");
+
+  const auto &schedModel = subtargetInfo.getSchedModel();
+  const auto dispatchWidth = getDispatchWidth(schedModel);
+  const auto resourceKinds = schedModel.getNumProcResourceKinds();
+
+  llvm::SmallVector<std::uint64_t, 8> procResourceMasks;
+  llvm::SmallVector<unsigned, 8> resIdx2ProcResID;
+
+  procResourceMasks.resize(resourceKinds);
+  resIdx2ProcResID.resize(resourceKinds, 0);
+
+  llvm::mca::computeProcResourceMasks(schedModel, procResourceMasks);
+
+  for (unsigned i = 1; i < resourceKinds; ++i) {
+    resIdx2ProcResID[llvm::mca::getResourceStateIndex(procResourceMasks[i])] = i;
+  }
+
+  llvm::SmallVector<unsigned, 8> blockResourceUsage;
+  blockResourceUsage.resize(resourceKinds, 0);
+
+  unsigned blockMicroOps = 0;
+
+  Simulation data;
+
+  data.general.iterations = DefaultIterations;
+  data.general.instructions = instructions.size();
+  data.general.totalCycles = totalCycles;
+
+  data.resourceUsage.dispatchWidth = dispatchWidth;
+  data.resourceUsage.resourceNames.reserve(resourceKinds - 1);
+  for (unsigned i = 1; i < resourceKinds; ++i) {
+    data.resourceUsage.resourceNames.push_back(schedModel.getProcResource(i)->Name);
+  }
+
+  data.instructionInfo.reserve(instructions.size());
+  data.resourceUsage.usageEntries.reserve(instructions.size());
+
+  for (size_t i = 0; i < instructions.size(); ++i) {
+    const auto &instr = lowered[i];
+    const auto &desc = instr->getDesc();
+    const auto *schedClassDesc = schedModel.getSchedClassDesc(desc.SchedClassID);
+
+    Assert(schedClassDesc != nullptr, "Can not create sched class desc for instruction!");
+
+    auto info = InstructionEntry{};
+    info.instrIndex = i;
+    info.uOps = desc.NumMicroOps;
+    info.latency = llvm::MCSchedModel::computeInstrLatency(subtargetInfo, *schedClassDesc);
+    info.rThroughput = llvm::MCSchedModel::getReciprocalThroughput(subtargetInfo, *schedClassDesc);
+    info.mayLoad = instr->getMayLoad();
+    info.mayStore = instr->getMayStore();
+    info.sideFx = instr->getHasSideEffects();
+
+    llvm::SmallVector<float> usage;
+    usage.assign(resourceKinds, 0.0F);
+    for (const auto &resource : desc.Resources) {
+      unsigned idx = resIdx2ProcResID[llvm::mca::getResourceStateIndex(resource.first)];
+      usage[idx] = resource.second.size();
+      blockResourceUsage[idx] += resource.second.size();
+    }
+    blockMicroOps += desc.NumMicroOps;
+
+    data.instructionInfo.push_back(info);
+    data.resourceUsage.usageEntries.push_back(ResourceUsageEntry{i, std::move(usage)});
+  }
+
+  data.general.totalMicroOps = blockMicroOps * DefaultIterations;
+  data.general.uOpsPerCycle = static_cast<double>(data.general.totalMicroOps) / static_cast<double>(totalCycles);
+  data.general.instructionsPerCycle =
+      static_cast<double>(data.general.instructions * DefaultIterations) / static_cast<double>(totalCycles);
+  data.general.blockRThroughput =
+      llvm::mca::computeBlockRThroughput(schedModel, dispatchWidth, blockMicroOps, blockResourceUsage);
+
+  return data;
+}
+
+std::vector<llvm::MCInst> X86Simulation::parse(const llvm::MCSubtargetInfo &subtargetInfo,
+                                               const std::vector<std::string> &instructions) const {
+  llvm::SourceMgr sourceMgr;
+  std::string program;
+
+  std::for_each(instructions.cbegin(), instructions.cend(), [&program](const auto &instr) {
+    program += instr;
+    program += '\n';
+  });
+
+  sourceMgr.AddNewSourceBuffer(llvm::MemoryBuffer::getMemBuffer(program), llvm::SMLoc());
+
+  auto ctx = llvm::MCContext(llvm::Triple(DefaultTargetTriple), asmInfo_.get(), regInfo_.get(), &subtargetInfo);
+  auto objectFileInfo = std::unique_ptr<llvm::MCObjectFileInfo>(target_->createMCObjectFileInfo(ctx, false));
+  ctx.setObjectFileInfo(objectFileInfo.get());
+
+  auto streamer = InstructionStreamer(ctx);
+
+  llvm::MCTargetOptions options;
+  options.PreserveAsmComments = false;
+
+  auto parser = std::unique_ptr<llvm::MCAsmParser>(llvm::createMCAsmParser(sourceMgr, ctx, streamer, *asmInfo_));
+
+  Assert(parser, "Failed to create `MCAsmParser`!");
+
+  auto targetParser = std::unique_ptr<llvm::MCTargetAsmParser>(
+      target_->createMCAsmParser(subtargetInfo, *parser, *instrInfo_, options));
+
+  Assert(targetParser, "Failed to create `MCTargetAsmParser`!");
+
+  parser->setTargetParser(*targetParser);
+  parser->Run(true);
+
+  Assert(streamer.hasInstructions(), "Failed to parse instructions!");
+
+  return streamer.instructions();
+}
+
+X86Simulation::LoweredProgram X86Simulation::lower(const llvm::MCSubtargetInfo &subtargetInfo,
+                                                   const std::vector<llvm::MCInst> &instructions) const {
+  auto instrAnalysis = std::unique_ptr<llvm::MCInstrAnalysis>(target_->createMCInstrAnalysis(instrInfo_.get()));
+  auto instrumentMgr = std::make_unique<llvm::mca::InstrumentManager>(subtargetInfo, *instrInfo_);
+
+  Assert(instrAnalysis, "Failed to create `MCInstrAnalysis`!");
+  Assert(instrumentMgr, "Failed to create `InstrumentManager`!");
+
+  auto instrBuilder = std::make_unique<llvm::mca::InstrBuilder>(
+      subtargetInfo, *instrInfo_, *regInfo_, instrAnalysis.get(), *instrumentMgr, DefaultCallLatency);
+
+  LoweredProgram program;
+  program.builder = std::move(instrBuilder);
+  program.instructions.reserve(instructions.size());
+
+  llvm::SmallVector<llvm::mca::Instrument *> instruments;
+
+  for (const auto &instr : instructions) {
+    auto loweredInstr = program.builder->createInstruction(instr, instruments);
+    Assert(loweredInstr, "Failed to lower instruction!");
+    program.instructions.emplace_back(std::move(*loweredInstr));
+  }
+
+  return program;
+}
+
+unsigned X86Simulation::run(const llvm::MCSubtargetInfo &subtargetInfo, const LoweredInstructions &lowered,
+                            std::vector<TimelineEntry> &timeline) const {
+  const auto &schedModel = subtargetInfo.getSchedModel();
+  const auto dispatchWidth = getDispatchWidth(schedModel);
+
+  auto src = llvm::mca::CircularSourceMgr(lowered, DefaultIterations);
+  auto options = llvm::mca::PipelineOptions(/*MicroOpQueueSize=*/0, /*DecodersThroughput=*/0,
+                                            /*DispatchWidth=*/dispatchWidth, /*RegisterFileSize=*/0,
+                                            /*LoadQueueSize=*/0, /*StoreQueueSize=*/0,
+                                            /*AssumeNoAlias=*/true);
+
+  auto ctx = llvm::mca::Context(*regInfo_, subtargetInfo);
+  auto customBehaviour = std::make_unique<llvm::mca::CustomBehaviour>(subtargetInfo, src, *instrInfo_);
+
+  Assert(customBehaviour, "Failed to create `CustomBehaviour`!");
+
+  auto pipeline = ctx.createDefaultPipeline(options, src, *customBehaviour);
+
+  TimelineRecorder recorder;
+  pipeline->addEventListener(&recorder);
+
+  auto cycles = pipeline->run();
+  Assert(cycles, "Failed to run pipeline");
+
+  const auto numInstructions = lowered.size();
+  for (const auto &[sourceIndex, stamp] : recorder.stamps()) {
+    TimelineEntry entry;
+    entry.iteration = sourceIndex / numInstructions;
+    entry.instrIndex = sourceIndex % numInstructions;
+
+    entry.dispatchCycles.push_back(stamp.dispatch >= 0 ? static_cast<std::size_t>(stamp.dispatch) : 0);
+    entry.waitQueueCycles.push_back(
+        stamp.issued >= 0 && stamp.dispatch >= 0 ? static_cast<std::size_t>(stamp.issued - stamp.dispatch) : 0);
+    entry.executeCycles.push_back(
+        stamp.executed >= 0 && stamp.issued >= 0 ? static_cast<std::size_t>(stamp.executed - stamp.issued) : 0);
+    entry.executeEndCycles.push_back(stamp.executed >= 0 ? static_cast<std::size_t>(stamp.executed) : 0);
+    entry.waitRetireCycles.push_back(
+        stamp.retired >= 0 && stamp.executed >= 0 ? static_cast<std::size_t>((stamp.retired - 1) - stamp.executed) : 0);
+    entry.retireCycles.push_back(stamp.retired >= 0 ? static_cast<std::size_t>(stamp.retired) : 0);
+
+    timeline.push_back(std::move(entry));
+  }
+
+  return *cycles;
 }
