@@ -48,8 +48,8 @@ llvm::Expected<Json::Value> GetJsonBody(const drogon::HttpRequestPtr &req) {
 }
 
 llvm::Expected<Params> ExtractParams(const Json::Value &object) {
-  Json::String cpu;
-  Json::String instruction;
+  std::string cpu;
+  std::string instruction;
 
   if (object.isMember("cpu") && object["cpu"].isString()) {
     cpu = object["cpu"].asString();
