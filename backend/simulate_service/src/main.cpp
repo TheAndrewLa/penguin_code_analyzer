@@ -13,6 +13,11 @@
 namespace {
 constexpr auto DefaultPort = std::uint16_t(8080);
 
+struct Params {
+  std::string cpu;
+  std::vector<std::string> instructions;
+};
+
 drogon::HttpResponsePtr MakeJsonError(const std::string &message, drogon::HttpStatusCode code) {
   Json::Value body;
   body["error"] = message;
@@ -43,13 +48,9 @@ llvm::Expected<Json::Value> GetJsonBody(const drogon::HttpRequestPtr &req) {
   return llvm::createStringError("Can not parse JSON object!");
 }
 
-struct Params {
-  std::string cpu;
-  std::vector<std::string> instructions;
-};
-
 llvm::Expected<Params> ExtractSimulationParams(const Json::Value &object) {
   std::string cpu;
+  std::vector<std::string> instructions;
 
   if (object.isMember("cpu") && object["cpu"].isString()) {
     cpu = object["cpu"].asString();
@@ -61,17 +62,11 @@ llvm::Expected<Params> ExtractSimulationParams(const Json::Value &object) {
     return llvm::createStringError("Field 'instructions' must be an array of strings!");
   }
 
-  std::vector<std::string> instructions;
-
   for (const auto &instr : object["instructions"]) {
     if (!instr.isString()) {
-      return llvm::createStringError("Every instruction must be a string!");
+      return llvm::createStringError("Instruction must be a string!");
     }
     instructions.emplace_back(instr.asString());
-  }
-
-  if (instructions.empty()) {
-    return llvm::createStringError("Field 'instructions' must not be empty!");
   }
 
   return Params{std::move(cpu), std::move(instructions)};
@@ -79,8 +74,8 @@ llvm::Expected<Params> ExtractSimulationParams(const Json::Value &object) {
 
 using SessionGetter = X86Simulation::JsonResult (X86Simulation::*)(const std::string &);
 
-void RegisterSessionGetter(drogon::HttpAppFramework &app, const std::string &path, X86Simulation &service,
-                           SessionGetter method) {
+void RegisterResultsHandler(drogon::HttpAppFramework &app, const std::string &path, X86Simulation &service,
+                            SessionGetter method) {
   app.registerHandler(path,
                       [&service, method](const drogon::HttpRequestPtr &req,
                                          std::function<void(const drogon::HttpResponsePtr &)> &&callback) {
@@ -159,7 +154,7 @@ int main(int argc, char *argv[]) {
   app.registerHandler(
       "/end",
       [&service](const drogon::HttpRequestPtr &req, std::function<void(const drogon::HttpResponsePtr &)> &&callback) {
-        const auto session = req->getParameter("session");
+        const auto &session = req->getParameter("session");
 
         if (session.empty()) {
           callback(MakeJsonError("Query parameter 'session' is not set!", drogon::k400BadRequest));
@@ -175,10 +170,10 @@ int main(int argc, char *argv[]) {
       },
       {drogon::Get});
 
-  RegisterSessionGetter(app, "/getGeneral", service, &X86Simulation::getGeneralResults);
-  RegisterSessionGetter(app, "/getInstructions", service, &X86Simulation::getInstructionInfo);
-  RegisterSessionGetter(app, "/getResources", service, &X86Simulation::getResourceUsage);
-  RegisterSessionGetter(app, "/getTimeline", service, &X86Simulation::getTimeline);
+  RegisterResultsHandler(app, "/getGeneral", service, &X86Simulation::getGeneralResults);
+  RegisterResultsHandler(app, "/getInstructions", service, &X86Simulation::getInstructionInfo);
+  RegisterResultsHandler(app, "/getResources", service, &X86Simulation::getResourceUsage);
+  RegisterResultsHandler(app, "/getTimeline", service, &X86Simulation::getTimeline);
 
   std::cout << "x86 simulation service listening on port " << port << std::endl;
 
