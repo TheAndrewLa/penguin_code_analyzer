@@ -179,8 +179,7 @@ X86Simulation::X86Simulation() {
 X86Simulation::~X86Simulation() = default;
 
 std::string X86Simulation::start(const std::string &cpu, const std::vector<std::string> &instructions) {
-  const auto session = newSession();
-  Simulation &data = results_[session];
+  Simulation data;
 
   try {
     auto subtargetInfo =
@@ -202,12 +201,21 @@ std::string X86Simulation::start(const std::string &cpu, const std::vector<std::
     data.error = "Unknown simulation error";
   }
 
+  std::unique_lock lock(resultsMutex_);
+  const auto session = newSession();
+  results_.emplace(session, std::move(data));
+
   return session;
 }
 
-void X86Simulation::end(const std::string &session) { results_.erase(session); }
+void X86Simulation::end(const std::string &session) {
+  std::unique_lock lock(resultsMutex_);
+  results_.erase(session);
+}
 
 X86Simulation::JsonResult X86Simulation::getGeneralResults(const std::string &session) {
+  std::shared_lock lock(resultsMutex_);
+
   auto iter = results_.find(session);
 
   if (iter == results_.end()) {
@@ -232,6 +240,8 @@ X86Simulation::JsonResult X86Simulation::getGeneralResults(const std::string &se
 }
 
 X86Simulation::JsonResult X86Simulation::getInstructionInfo(const std::string &session) {
+  std::shared_lock lock(resultsMutex_);
+
   auto iter = results_.find(session);
 
   if (iter == results_.end()) {
@@ -260,6 +270,8 @@ X86Simulation::JsonResult X86Simulation::getInstructionInfo(const std::string &s
 }
 
 X86Simulation::JsonResult X86Simulation::getResourceUsage(const std::string &session) {
+  std::shared_lock lock(resultsMutex_);
+
   auto iter = results_.find(session);
 
   if (iter == results_.end()) {
@@ -299,6 +311,8 @@ X86Simulation::JsonResult X86Simulation::getResourceUsage(const std::string &ses
 }
 
 X86Simulation::JsonResult X86Simulation::getTimeline(const std::string &session) {
+  std::shared_lock lock(resultsMutex_);
+
   auto iter = results_.find(session);
 
   if (iter == results_.end()) {

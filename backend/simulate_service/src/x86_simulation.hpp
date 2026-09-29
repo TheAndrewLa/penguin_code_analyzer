@@ -8,6 +8,7 @@
 
 #include <cstddef>
 #include <memory>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -103,13 +104,6 @@ private:
     bool success = false;
   };
 
-  struct _Simulation {
-    GeneralInfo general{};
-    ResourceUsage resources;
-    std::vector<InstructionEntry> instructions;
-    std::vector<TimelineEntry> timeline;
-  };
-
   using SimulationResult = llvm::Expected<Simulation>;
 
   using ParsedInstructions = std::vector<llvm::MCInst>;
@@ -140,6 +134,8 @@ private:
   std::unique_ptr<llvm::MCInstrInfo> instrInfo_;
 
   std::unordered_map<std::string, Simulation> results_;
+
+  mutable std::shared_mutex resultsMutex_;
 };
 
 #endif // X86_SIMULATION_HPP
