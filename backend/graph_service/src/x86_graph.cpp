@@ -648,15 +648,11 @@ Json::Value X86GraphBuilder::serializeBlock(const Function &function, const Bloc
 Json::Value X86GraphBuilder::serializeEdge(const std::string &to, std::uint8_t flags) {
   auto edge = Json::Value(Json::objectValue);
   edge["to"] = to;
+  edge["conditional"] = static_cast<bool>(flags & Conditional);
+  edge["fallthrough"] = static_cast<bool>(flags & Fallthrough);
 
   if ((flags & Conditional) != 0) {
-    edge["conditional"] = true;
-  }
-  if ((flags & Fallthrough) != 0) {
-    edge["fallthrough"] = true;
-  }
-  if ((flags & Taken) != 0) {
-    edge["taken"] = true;
+    edge["taken"] = static_cast<bool>(flags & Taken);
   }
 
   return edge;
