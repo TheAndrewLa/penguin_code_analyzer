@@ -1,9 +1,11 @@
 #include "x86_graph.hpp"
 
-#include <iterator>
 #include <llvm/MC/MCAsmInfo.h>
 #include <llvm/MC/MCContext.h>
 #include <llvm/MC/MCDisassembler/MCDisassembler.h>
+#include <llvm/MC/MCDisassembler/MCRelocationInfo.h>
+#include <llvm/MC/MCDisassembler/MCSymbolizer.h>
+#include <llvm/MC/MCExpr.h>
 #include <llvm/MC/MCInst.h>
 #include <llvm/MC/MCInstPrinter.h>
 #include <llvm/MC/MCInstrAnalysis.h>
@@ -25,6 +27,7 @@
 #include <chrono>
 #include <cstdint>
 #include <exception>
+#include <iterator>
 #include <memory>
 #include <mutex>
 #include <sstream>
@@ -80,6 +83,12 @@ std::string trimmed(const std::string &text) {
   return text.substr(begin, end - begin + 1);
 }
 
+std::string normalizeText(const std::string &text) {
+  auto normalized = trimmed(text);
+  std::replace(normalized.begin(), normalized.end(), '\t', ' ');
+  return normalized;
+}
+
 std::uint64_t symbolSize(const llvm::object::SymbolRef &sym, const llvm::object::ObjectFile &object) {
   if (llvm::isa<llvm::object::ELFObjectFileBase>(&object)) {
     return llvm::object::ELFSymbolRef(sym).getSize();
@@ -124,6 +133,107 @@ std::vector<std::uint8_t> readSymbolBytes(const llvm::object::SymbolRef &sym, co
 
   const auto available = std::min<std::uint64_t>(size, contents.size() - offset);
   return {contents.bytes_begin() + offset, contents.bytes_begin() + offset + available};
+}
+
+class SymbolResolver : public llvm::MCSymbolizer {
+public:
+  SymbolResolver(llvm::MCContext &ctx, std::unique_ptr<llvm::MCRelocationInfo> relInfo,
+                 const std::unordered_map<std::uint64_t, std::string> &symbols,
+                 const std::unordered_map<std::uint64_t, std::string> &relocations)
+      : llvm::MCSymbolizer(ctx, std::move(relInfo)), symbols_(symbols), relocations_(relocations) {}
+
+  bool tryAddingSymbolicOperand(llvm::MCInst &instr, llvm::raw_ostream &, std::int64_t value, std::uint64_t address,
+                                bool isBranch, std::uint64_t offset, std::uint64_t, std::uint64_t) override {
+    if (!isBranch) {
+      return false;
+    }
+
+    const auto relocation = relocations_.find(address + offset);
+
+    if (relocation != relocations_.end()) {
+      addSymbolOperand(instr, relocation->second);
+      return true;
+    }
+
+    const auto symbol = symbols_.find(static_cast<std::uint64_t>(value));
+
+    if (symbol != symbols_.end()) {
+      addSymbolOperand(instr, symbol->second);
+      return true;
+    }
+
+    return false;
+  }
+
+  void tryAddingPcLoadReferenceComment(llvm::raw_ostream &, int64_t, uint64_t) override {}
+
+private:
+  void addSymbolOperand(llvm::MCInst &instr, const std::string &name) {
+    auto *symbol = Ctx.getOrCreateSymbol(name);
+    instr.addOperand(llvm::MCOperand::createExpr(llvm::MCSymbolRefExpr::create(symbol, Ctx)));
+  }
+
+  const std::unordered_map<std::uint64_t, std::string> &symbols_;
+  const std::unordered_map<std::uint64_t, std::string> &relocations_;
+};
+
+void collectRelocations(std::unordered_map<std::uint64_t, std::string> &relocations,
+                        const llvm::object::ObjectFile &object) {
+  for (const auto &section : object.sections()) {
+    for (const auto &reloc : section.relocations()) {
+      auto symbolIter = reloc.getSymbol();
+
+      if (symbolIter == object.symbol_end()) {
+        continue;
+      }
+
+      auto nameOrError = symbolIter->getName();
+
+      if (!nameOrError) {
+        llvm::consumeError(nameOrError.takeError());
+        continue;
+      }
+
+      const auto name = nameOrError->str();
+
+      if (!name.empty()) {
+        relocations.try_emplace(reloc.getOffset(), name);
+      }
+    }
+  }
+}
+
+void collectSymbol(std::unordered_map<std::uint64_t, std::string> &symbols, const llvm::object::SymbolRef &sym) {
+  auto nameOrError = sym.getName();
+
+  if (!nameOrError) {
+    llvm::consumeError(nameOrError.takeError());
+    return;
+  }
+
+  auto typeOrError = sym.getType();
+
+  if (!typeOrError) {
+    llvm::consumeError(typeOrError.takeError());
+    return;
+  }
+
+  if (*typeOrError != llvm::object::SymbolRef::ST_Function && *typeOrError != llvm::object::SymbolRef::ST_Data) {
+    return;
+  }
+
+  auto addressOrError = sym.getAddress();
+
+  if (!addressOrError) {
+    llvm::consumeError(addressOrError.takeError());
+    return;
+  }
+
+  const auto name = nameOrError->str();
+
+  if (!name.empty()) {
+    symbols.try_emplace(*addressOrError, name);
+  }
 }
 } // namespace
 
@@ -184,8 +294,6 @@ X86GraphBuilder::BaseResult X86GraphBuilder::start(const std::byte *bytes, std::
 
     parseFunctions(*session, *object);
 
-    const auto sessionId = newSession();
-
     std::vector<std::string> names;
     names.reserve(session->functions.size());
     for (const auto &[name, unused] : session->functions) {
@@ -194,6 +302,8 @@ X86GraphBuilder::BaseResult X86GraphBuilder::start(const std::byte *bytes, std::
     }
     std::sort(names.begin(), names.end());
 
+    auto lock = std::unique_lock(sessionsMutex_);
+    const auto sessionId = newSession();
     sessions_.emplace(sessionId, std::move(session));
 
     return BaseInfo{std::move(names), sessionId};
@@ -204,9 +314,14 @@ X86GraphBuilder::BaseResult X86GraphBuilder::start(const std::byte *bytes, std::
   }
 }
 
-void X86GraphBuilder::end(const std::string &session) { sessions_.erase(session); }
+void X86GraphBuilder::end(const std::string &session) {
+  auto lock = std::unique_lock(sessionsMutex_);
+  sessions_.erase(session);
+}
 
 X86GraphBuilder::JsonResult X86GraphBuilder::getFunctionGraph(const std::string &session, const std::string &name) {
+  auto lock = std::shared_lock(sessionsMutex_);
+
   auto iter = sessions_.find(session);
 
   if (iter == sessions_.end()) {
@@ -229,15 +344,21 @@ X86GraphBuilder::JsonResult X86GraphBuilder::getFunctionGraph(const std::string 
 }
 
 void X86GraphBuilder::parseFunctions(Session &session, const llvm::object::ObjectFile &object) const {
+  collectRelocations(session.relocations, object);
+
   for (const auto &sym : object.symbols()) {
-    if (auto function = extractFunction(sym, object)) {
+    collectSymbol(session.symbols, sym);
+
+    if (auto function = extractFunction(sym, object, session.symbols, session.relocations)) {
       session.functions.emplace(function->name, std::move(*function));
     }
   }
 }
 
-std::optional<X86GraphBuilder::Function>
-X86GraphBuilder::extractFunction(const llvm::object::SymbolRef &sym, const llvm::object::ObjectFile &object) const {
+std::optional<X86GraphBuilder::Function> X86GraphBuilder::extractFunction(const llvm::object::SymbolRef &sym,
+                                                                          const llvm::object::ObjectFile &object,
+                                                                          const SymbolMap &symbols,
+                                                                          const SymbolMap &relocations) const {
   auto nameOrError = sym.getName();
 
   if (!nameOrError) {
@@ -269,12 +390,12 @@ X86GraphBuilder::extractFunction(const llvm::object::SymbolRef &sym, const llvm:
   function.size = symbolSize(sym, object);
   function.bytes = readSymbolBytes(sym, object, function.address, function.size);
 
-  disassemble(function);
+  disassemble(function, symbols, relocations);
 
   return function;
 }
 
-void X86GraphBuilder::disassemble(Function &function) const {
+void X86GraphBuilder::disassemble(Function &function, const SymbolMap &symbols, const SymbolMap &relocations) const {
   if (function.bytes.empty()) {
     return;
   }
@@ -290,6 +411,8 @@ void X86GraphBuilder::disassemble(Function &function) const {
 
   auto disassembler = std::unique_ptr<llvm::MCDisassembler>(target_->createMCDisassembler(*subtargetInfo, ctx));
   Assert(disassembler, "Can not create `MCDisassembler`!");
+
+  disassembler->setSymbolizer(std::make_unique<SymbolResolver>(ctx, nullptr, symbols, relocations));
 
   auto printer = std::unique_ptr<llvm::MCInstPrinter>(
       target_->createMCInstPrinter(llvm::Triple(DefaultTargetTriple), 0, *asmInfo_, *instrInfo_, *regInfo_));
@@ -308,6 +431,14 @@ void X86GraphBuilder::disassemble(Function &function) const {
 
     if (status != llvm::MCDisassembler::Success || size == 0) {
       break;
+    }
+
+    const auto opcodeName = instrInfo_->getName(inst.getOpcode());
+
+    if (offset == 0 && (opcodeName == "ENDBR64" || opcodeName == "ENDBR32")) {
+      progamCounter += size;
+      offset += static_cast<std::size_t>(size);
+      continue;
     }
 
     Instruction instruction;
@@ -330,7 +461,7 @@ void X86GraphBuilder::disassemble(Function &function) const {
     llvm::raw_string_ostream ostream(text);
     printer->printInst(&inst, progamCounter, "", *subtargetInfo, ostream);
     ostream.flush();
-    instruction.text = trimmed(text);
+    instruction.text = normalizeText(text);
 
     function.instructions.push_back(std::move(instruction));
 

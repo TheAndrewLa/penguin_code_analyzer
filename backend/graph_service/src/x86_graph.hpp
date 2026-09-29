@@ -10,6 +10,7 @@
 #include <memory>
 #include <optional>
 #include <set>
+#include <shared_mutex>
 #include <string>
 #include <unordered_map>
 #include <vector>
@@ -75,6 +76,8 @@ private:
     std::unique_ptr<llvm::MemoryBuffer> buffer;
     std::unique_ptr<llvm::object::ObjectFile> object;
     std::unordered_map<std::string, Function> functions;
+    std::unordered_map<std::uint64_t, std::string> symbols;
+    std::unordered_map<std::uint64_t, std::string> relocations;
   };
 
   struct Block {
@@ -87,14 +90,15 @@ private:
   };
 
   using AddressIndex = std::unordered_map<std::uint64_t, std::size_t>;
+  using SymbolMap = std::unordered_map<std::uint64_t, std::string>;
 
   static std::string newSession();
 
   void parseFunctions(Session &session, const llvm::object::ObjectFile &object) const;
-  std::optional<Function> extractFunction(const llvm::object::SymbolRef &sym,
-                                          const llvm::object::ObjectFile &object) const;
+  std::optional<Function> extractFunction(const llvm::object::SymbolRef &sym, const llvm::object::ObjectFile &object,
+                                          const SymbolMap &symbols, const SymbolMap &relocations) const;
 
-  void disassemble(Function &function) const;
+  void disassemble(Function &function, const SymbolMap &symbols, const SymbolMap &relocations) const;
 
   static Json::Value buildGraph(const Function &function);
 
@@ -126,6 +130,8 @@ private:
   std::unique_ptr<llvm::MCInstrInfo> instrInfo_;
 
   std::unordered_map<std::string, std::unique_ptr<Session>> sessions_;
+
+  mutable std::shared_mutex sessionsMutex_;
 };
 
 #endif // X86_GRAPH_HPP
