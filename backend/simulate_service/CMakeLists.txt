@@ -40,6 +40,7 @@ llvm_map_components_to_libnames(
     x86codegen
     x86asmparser
     x86disassembler
+    x86targetmca
 )
 
 add_executable(service
