@@ -1,7 +1,13 @@
+.cache
 .vscode
 build/
-**/CMakeFiles/
+build-*/
 
-CMakeCache.txt
+node_modules/
+package-lock.json
+
+**/CMakeFiles/
 **/cmake_install.cmake
+__cmake_systeminformation
+CMakeCache.txt
 CMakeUserPresets.json

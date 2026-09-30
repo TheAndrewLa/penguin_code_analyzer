@@ -1,15 +1,21 @@
 CompileFlags:
-  Add: [-std=c++23, -Wall, --gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/13]
-  Compiler: g++
+    Add: [-std=c++23, -Wall, --gcc-install-dir=/usr/lib/gcc/x86_64-linux-gnu/13]
+    Compiler: g++
 
 Diagnostics:
-  ClangTidy:
-    Add: [modernize-*, performance-*, readability-*, hicpp-*]
-    Remove: [modernize-use-trailing-return-type, modernize-use-nodiscard]
+    ClangTidy:
+        Add: [modernize-*, performance-*, readability-*, hicpp-*]
+        Remove:
+            [
+                modernize-use-trailing-return-type,
+                modernize-use-nodiscard,
+                hicpp-special-member-functions,
+                hicpp-explicit-conversions,
+            ]
 
 Index:
-  Background: Build
-  StandardLibrary: true
+    Background: Build
+    StandardLibrary: true
 
 If:
-  PathMatch: .*\.cpp|.*\.hpp
+    PathMatch: .*\.cpp|.*\.hpp
