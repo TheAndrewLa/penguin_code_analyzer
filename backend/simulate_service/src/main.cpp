@@ -13,6 +13,8 @@
 namespace {
 constexpr auto DefaultPort = std::uint16_t(8080);
 
+constexpr auto MaxBodySize = 64U * 1024U * 1024U;
+
 struct Params {
   std::string cpu;
   std::vector<std::string> instructions;
@@ -102,10 +104,9 @@ int main(int argc, char *argv[]) {
   auto port = DefaultPort;
 
   for (int i = 1; i < argc; ++i) {
-    const auto arg = std::string(argv[i]);
-
-    if (arg.rfind("--port=", 0) == 0) {
-      port = std::stoi(arg.substr(7));
+    std::string arg = argv[i];
+    if ((arg == "--port" || arg == "-p") && i + 1 < argc) {
+      port = std::stoi(argv[++i]);
     }
   }
 
@@ -114,6 +115,9 @@ int main(int argc, char *argv[]) {
 
   app.addListener("0.0.0.0", port);
   app.setThreadNum(std::thread::hardware_concurrency());
+
+  app.setClientMaxBodySize(MaxBodySize);
+  app.setClientMaxMemoryBodySize(MaxBodySize);
 
   app.registerHandler(
       "/health",

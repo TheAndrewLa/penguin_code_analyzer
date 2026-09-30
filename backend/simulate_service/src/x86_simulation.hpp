@@ -51,6 +51,8 @@ private:
   static constexpr auto DefaultTargetTriple = "x86_64-unknown-linux-gnu";
 
   static constexpr auto DefaultIterations = 100;
+  static constexpr auto DefaultTimelineSize = 10U;
+
   static constexpr auto DefaultCallLatency = 100;
 
   struct GeneralInfo {

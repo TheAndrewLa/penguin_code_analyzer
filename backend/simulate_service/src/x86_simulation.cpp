@@ -190,8 +190,10 @@ std::string X86Simulation::start(const std::string &cpu, const std::vector<std::
 
     auto parsed = parse(*subtargetInfo, instructions);
     auto lowered = lower(*subtargetInfo, parsed);
-    unsigned totalCycles = run(*subtargetInfo, lowered.instructions, data.timeline);
+    std::vector<TimelineEntry> timeline;
+    unsigned totalCycles = run(*subtargetInfo, lowered.instructions, timeline);
     data = collectResults(*subtargetInfo, parsed, lowered.instructions, totalCycles);
+    data.timeline = std::move(timeline);
     data.success = true;
   } catch (const AnalyzeError &error) {
     data.success = false;
@@ -525,23 +527,42 @@ unsigned X86Simulation::run(const llvm::MCSubtargetInfo &subtargetInfo, const Lo
   Assert(cycles, "Failed to run pipeline");
 
   const auto numInstructions = lowered.size();
+
   for (const auto &[sourceIndex, stamp] : recorder.stamps()) {
     TimelineEntry entry;
     entry.iteration = sourceIndex / numInstructions;
     entry.instrIndex = sourceIndex % numInstructions;
 
-    entry.dispatchCycles.push_back(stamp.dispatch >= 0 ? static_cast<std::size_t>(stamp.dispatch) : 0);
-    entry.waitQueueCycles.push_back(
-        stamp.issued >= 0 && stamp.dispatch >= 0 ? static_cast<std::size_t>(stamp.issued - stamp.dispatch) : 0);
-    entry.executeCycles.push_back(
-        stamp.executed >= 0 && stamp.issued >= 0 ? static_cast<std::size_t>(stamp.executed - stamp.issued) : 0);
-    entry.executeEndCycles.push_back(stamp.executed >= 0 ? static_cast<std::size_t>(stamp.executed) : 0);
-    entry.waitRetireCycles.push_back(
-        stamp.retired >= 0 && stamp.executed >= 0 ? static_cast<std::size_t>((stamp.retired - 1) - stamp.executed) : 0);
-    entry.retireCycles.push_back(stamp.retired >= 0 ? static_cast<std::size_t>(stamp.retired) : 0);
+    auto appendRange = [](llvm::SmallVector<std::size_t> &out, int begin, int end) {
+      if (begin <= end) {
+        for (int c = begin; c <= end; ++c) {
+          out.push_back(static_cast<std::size_t>(c));
+        }
+      }
+    };
+
+    if (stamp.dispatch >= 0) {
+      entry.dispatchCycles.push_back(static_cast<std::size_t>(stamp.dispatch));
+      appendRange(entry.waitQueueCycles, stamp.dispatch + 1, stamp.issued);
+    }
+
+    if (stamp.issued >= 0 && stamp.executed >= 0) {
+      appendRange(entry.executeCycles, stamp.issued + 1, stamp.executed - 1);
+    }
+
+    if (stamp.executed >= 0) {
+      entry.executeEndCycles.push_back(static_cast<std::size_t>(stamp.executed));
+      appendRange(entry.waitRetireCycles, stamp.executed + 1, stamp.retired - 1);
+    }
+
+    if (stamp.retired >= 0) {
+      entry.retireCycles.push_back(static_cast<std::size_t>(stamp.retired));
+    }
 
     timeline.push_back(std::move(entry));
   }
+
+  timeline.resize(DefaultTimelineSize * numInstructions);
 
   return *cycles;
 }
