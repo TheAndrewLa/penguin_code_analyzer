@@ -44,7 +44,6 @@ public:
 
   JsonResult getGeneralResults(const std::string &session);
   JsonResult getInstructionInfo(const std::string &session);
-  JsonResult getResourceUsage(const std::string &session);
   JsonResult getTimeline(const std::string &session);
 
 private:
@@ -75,17 +74,6 @@ private:
     bool sideFx;
   };
 
-  struct ResourceUsageEntry {
-    std::size_t instrIndex;
-    llvm::SmallVector<float> resources;
-  };
-
-  struct ResourceUsage {
-    llvm::SmallVector<std::string> resourceNames;
-    std::size_t dispatchWidth;
-    std::vector<ResourceUsageEntry> usageEntries;
-  };
-
   struct TimelineEntry {
     std::size_t iteration;
     std::size_t instrIndex;
@@ -100,7 +88,6 @@ private:
   struct Simulation {
     GeneralInfo general{};
     std::vector<InstructionEntry> instructionInfo;
-    ResourceUsage resourceUsage;
     std::vector<TimelineEntry> timeline;
     std::string error;
     bool success = false;

@@ -26,6 +26,8 @@
 #include <llvm/MCA/SourceMgr.h>
 #include <llvm/MCA/Support.h>
 
+#include <llvm/ADT/SmallVector.h>
+
 #include <llvm/Support/Error.h>
 #include <llvm/Support/MemoryBuffer.h>
 #include <llvm/Support/SourceMgr.h>
@@ -101,8 +103,6 @@ unsigned getDispatchWidth(const llvm::MCSchedModel &model) {
   return (width == 0) ? 1 : width;
 }
 
-// Records, for every instruction instance, the cycle in which it was
-// dispatched, issued, executed and retired.
 class TimelineRecorder : public llvm::mca::HWEventListener {
 public:
   struct Stamps {
@@ -188,10 +188,11 @@ std::string X86Simulation::start(const std::string &cpu, const std::vector<std::
     Assert(subtargetInfo, "Failed to create `MCSubtargetInfo`!");
     Assert(subtargetInfo->getSchedModel().hasInstrSchedModel(), "No scheduling information for CPU!");
 
+    std::vector<TimelineEntry> timeline;
+
     auto parsed = parse(*subtargetInfo, instructions);
     auto lowered = lower(*subtargetInfo, parsed);
-    std::vector<TimelineEntry> timeline;
-    unsigned totalCycles = run(*subtargetInfo, lowered.instructions, timeline);
+    const auto totalCycles = run(*subtargetInfo, lowered.instructions, timeline);
     data = collectResults(*subtargetInfo, parsed, lowered.instructions, totalCycles);
     data.timeline = std::move(timeline);
     data.success = true;
@@ -271,47 +272,6 @@ X86Simulation::JsonResult X86Simulation::getInstructionInfo(const std::string &s
   return result;
 }
 
-X86Simulation::JsonResult X86Simulation::getResourceUsage(const std::string &session) {
-  std::shared_lock lock(resultsMutex_);
-
-  auto iter = results_.find(session);
-
-  if (iter == results_.end()) {
-    return MakeError("Can not find resource usage!");
-  }
-
-  if (!iter->second.success) {
-    return MakeError(iter->second.error);
-  }
-
-  const auto &resourceUsage = iter->second.resourceUsage;
-
-  auto result = Json::Value(Json::objectValue);
-  auto resources = Json::Value(Json::arrayValue);
-  std::for_each(resourceUsage.resourceNames.begin(), resourceUsage.resourceNames.end(),
-                [&resources](const auto &name) { resources.append(name); });
-
-  result["resources"] = std::move(resources);
-  result["dispatchWidth"] = resourceUsage.dispatchWidth;
-
-  auto usage = Json::Value(Json::arrayValue);
-  for (const auto &entry : resourceUsage.usageEntries) {
-    auto item = Json::Value(Json::objectValue);
-    item["instrIndex"] = entry.instrIndex;
-
-    auto cycles = Json::Value(Json::arrayValue);
-    std::for_each(entry.resources.begin(), entry.resources.end(),
-                  [&cycles](const auto &value) { cycles.append(value); });
-
-    item["cycles"] = std::move(cycles);
-
-    usage.append(std::move(item));
-  }
-  result["usage"] = std::move(usage);
-
-  return result;
-}
-
 X86Simulation::JsonResult X86Simulation::getTimeline(const std::string &session) {
   std::shared_lock lock(resultsMutex_);
 
@@ -367,22 +327,8 @@ X86Simulation::Simulation X86Simulation::collectResults(const llvm::MCSubtargetI
   const auto dispatchWidth = getDispatchWidth(schedModel);
   const auto resourceKinds = schedModel.getNumProcResourceKinds();
 
-  llvm::SmallVector<std::uint64_t, 8> procResourceMasks;
-  llvm::SmallVector<unsigned, 8> resIdx2ProcResID;
-
-  procResourceMasks.resize(resourceKinds);
-  resIdx2ProcResID.resize(resourceKinds, 0);
-
+  llvm::SmallVector<std::uint64_t, 8> procResourceMasks(resourceKinds);
   llvm::mca::computeProcResourceMasks(schedModel, procResourceMasks);
-
-  for (unsigned i = 1; i < resourceKinds; ++i) {
-    resIdx2ProcResID[llvm::mca::getResourceStateIndex(procResourceMasks[i])] = i;
-  }
-
-  llvm::SmallVector<unsigned, 8> blockResourceUsage;
-  blockResourceUsage.resize(resourceKinds, 0);
-
-  unsigned blockMicroOps = 0;
 
   Simulation data;
 
@@ -390,50 +336,60 @@ X86Simulation::Simulation X86Simulation::collectResults(const llvm::MCSubtargetI
   data.general.instructions = instructions.size();
   data.general.totalCycles = totalCycles;
 
-  data.resourceUsage.dispatchWidth = dispatchWidth;
-  data.resourceUsage.resourceNames.reserve(resourceKinds - 1);
-  for (unsigned i = 1; i < resourceKinds; ++i) {
-    data.resourceUsage.resourceNames.push_back(schedModel.getProcResource(i)->Name);
-  }
-
   data.instructionInfo.reserve(instructions.size());
-  data.resourceUsage.usageEntries.reserve(instructions.size());
+
+  unsigned blockMicroOps = 0;
 
   for (size_t i = 0; i < instructions.size(); ++i) {
     const auto &instr = lowered[i];
     const auto &desc = instr->getDesc();
-    const auto *schedClassDesc = schedModel.getSchedClassDesc(desc.SchedClassID);
+    const auto *SCDesc = schedModel.getSchedClassDesc(desc.SchedClassID);
+    Assert(SCDesc != nullptr, "Can not create sched class desc for instruction!");
 
-    Assert(schedClassDesc != nullptr, "Can not create sched class desc for instruction!");
-
-    auto info = InstructionEntry{};
+    InstructionEntry info{};
     info.instrIndex = i;
     info.uOps = desc.NumMicroOps;
-    info.latency = llvm::MCSchedModel::computeInstrLatency(subtargetInfo, *schedClassDesc);
-    info.rThroughput = llvm::MCSchedModel::getReciprocalThroughput(subtargetInfo, *schedClassDesc);
+    info.latency = llvm::MCSchedModel::computeInstrLatency(subtargetInfo, *SCDesc);
+    info.rThroughput = llvm::MCSchedModel::getReciprocalThroughput(subtargetInfo, *SCDesc);
     info.mayLoad = instr->getMayLoad();
     info.mayStore = instr->getMayStore();
     info.sideFx = instr->getHasSideEffects();
 
-    llvm::SmallVector<float> usage;
-    usage.assign(resourceKinds, 0.0F);
-    for (const auto &resource : desc.Resources) {
-      unsigned idx = resIdx2ProcResID[llvm::mca::getResourceStateIndex(resource.first)];
-      usage[idx] = resource.second.size();
-      blockResourceUsage[idx] += resource.second.size();
-    }
     blockMicroOps += desc.NumMicroOps;
-
     data.instructionInfo.push_back(info);
-    data.resourceUsage.usageEntries.push_back(ResourceUsageEntry{i, std::move(usage)});
   }
 
   data.general.totalMicroOps = blockMicroOps * DefaultIterations;
   data.general.uOpsPerCycle = static_cast<double>(data.general.totalMicroOps) / static_cast<double>(totalCycles);
   data.general.instructionsPerCycle =
       static_cast<double>(data.general.instructions * DefaultIterations) / static_cast<double>(totalCycles);
+
+  // Block RThroughput still uses the static model.
+  llvm::SmallVector<unsigned, 8> blockUsage(resourceKinds, 0);
+  for (size_t i = 0; i < instructions.size(); ++i) {
+    const auto &desc = lowered[i]->getDesc();
+    for (const auto &resource : desc.Resources) {
+      const uint64_t mask = resource.first;
+      const unsigned cycles = resource.second.size();
+      if (cycles == 0) {
+        continue;
+      }
+      uint64_t remaining = mask;
+      while (remaining != 0) {
+        const unsigned stateIdx = llvm::mca::getResourceStateIndex(remaining);
+        remaining &= ~(1ULL << stateIdx);
+        for (unsigned k = 1; k < resourceKinds; ++k) {
+          if (procResourceMasks[k] == (1ULL << stateIdx)) {
+            blockUsage[k] += cycles;
+            break;
+          }
+        }
+      }
+    }
+  }
+
   data.general.blockRThroughput =
-      llvm::mca::computeBlockRThroughput(schedModel, dispatchWidth, blockMicroOps, blockResourceUsage);
+      llvm::mca::computeBlockRThroughput(schedModel, dispatchWidth, blockMicroOps, blockUsage);
 
   return data;
 }
@@ -508,10 +464,7 @@ unsigned X86Simulation::run(const llvm::MCSubtargetInfo &subtargetInfo, const Lo
   const auto dispatchWidth = getDispatchWidth(schedModel);
 
   auto src = llvm::mca::CircularSourceMgr(lowered, DefaultIterations);
-  auto options = llvm::mca::PipelineOptions(/*MicroOpQueueSize=*/0, /*DecodersThroughput=*/0,
-                                            /*DispatchWidth=*/dispatchWidth, /*RegisterFileSize=*/0,
-                                            /*LoadQueueSize=*/0, /*StoreQueueSize=*/0,
-                                            /*AssumeNoAlias=*/true);
+  auto options = llvm::mca::PipelineOptions(0, 0, dispatchWidth, 0, 0, 0, true);
 
   auto ctx = llvm::mca::Context(*regInfo_, subtargetInfo);
   auto customBehaviour = std::make_unique<llvm::mca::CustomBehaviour>(subtargetInfo, src, *instrInfo_);
@@ -520,15 +473,15 @@ unsigned X86Simulation::run(const llvm::MCSubtargetInfo &subtargetInfo, const Lo
 
   auto pipeline = ctx.createDefaultPipeline(options, src, *customBehaviour);
 
-  TimelineRecorder recorder;
-  pipeline->addEventListener(&recorder);
+  TimelineRecorder timelineRecorder;
+  pipeline->addEventListener(&timelineRecorder);
 
   auto cycles = pipeline->run();
   Assert(cycles, "Failed to run pipeline");
 
   const auto numInstructions = lowered.size();
 
-  for (const auto &[sourceIndex, stamp] : recorder.stamps()) {
+  for (const auto &[sourceIndex, stamp] : timelineRecorder.stamps()) {
     TimelineEntry entry;
     entry.iteration = sourceIndex / numInstructions;
     entry.instrIndex = sourceIndex % numInstructions;

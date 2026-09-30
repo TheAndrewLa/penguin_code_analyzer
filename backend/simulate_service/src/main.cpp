@@ -176,7 +176,6 @@ int main(int argc, char *argv[]) {
 
   RegisterResultsHandler(app, "/getGeneral", service, &X86Simulation::getGeneralResults);
   RegisterResultsHandler(app, "/getInstructions", service, &X86Simulation::getInstructionInfo);
-  RegisterResultsHandler(app, "/getResources", service, &X86Simulation::getResourceUsage);
   RegisterResultsHandler(app, "/getTimeline", service, &X86Simulation::getTimeline);
 
   std::cout << "x86 simulation service listening on port " << port << std::endl;
