@@ -5,17 +5,25 @@ interface SelectFieldProps {
     value: string;
     onChange: (value: string) => void;
     options: string[];
+    disabled?: boolean;
 }
 
 const SelectField: React.FC<SelectFieldProps> = ({
     value,
     onChange,
     options,
+    disabled = false,
 }) => {
     const sortedOptions = [value, ...options.filter((opt) => opt !== value)];
     return (
-        <Select.Root value={value} onValueChange={onChange}>
-            <Select.Trigger className="inline-flex items-center justify-between gap-2 px-3 py-1 bg-white border border-gray-300 rounded-md text-base shadow-sm hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500 w-auto">
+        <Select.Root value={value} onValueChange={onChange} disabled={disabled}>
+            <Select.Trigger
+                className={`inline-flex items-center justify-between gap-2 px-3 py-1 bg-white border border-gray-300 rounded-md text-base shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 w-auto ${
+                    disabled
+                        ? "opacity-50 cursor-not-allowed"
+                        : "hover:bg-gray-50"
+                }`}
+            >
                 <Select.Value />
                 <Select.Icon>
                     <ChevronDownIcon size={16} />

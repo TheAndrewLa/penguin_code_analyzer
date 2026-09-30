@@ -5,9 +5,9 @@ interface GeneralViewProps {
     instructions: number;
     totalCycles: number;
     totalMicroOps: number;
-    microOpsPerCycle: number;
+    uOpsPerCycle: number;
     instructionsPerCycle: number;
-    blockThroughput: number;
+    blockRThroughput: number;
 }
 
 export const GeneralView: React.FC<GeneralViewProps> = ({
@@ -15,22 +15,22 @@ export const GeneralView: React.FC<GeneralViewProps> = ({
     instructions,
     totalCycles,
     totalMicroOps,
-    microOpsPerCycle,
+    uOpsPerCycle,
     instructionsPerCycle,
-    blockThroughput,
+    blockRThroughput,
 }) => {
     const rows: Array<{ label: string; value: number | string }> = [
         { label: "Iterations", value: iterations },
         { label: "Instructions", value: instructions },
         { label: "Total cycles", value: totalCycles },
         { label: "Total μOps", value: totalMicroOps },
-        { label: "μOps / cycle", value: microOpsPerCycle },
+        { label: "μOps / cycle", value: uOpsPerCycle },
         { label: "IPC", value: instructionsPerCycle },
-        { label: "Block reciprocal throughput", value: blockThroughput },
+        { label: "Block reciprocal throughput", value: blockRThroughput },
     ];
 
     return (
-        <div className="w-[60%] p-5">
+        <div className="w-[60%]">
             <table className="table-fixed border-collapse w-full">
                 <colgroup>
                     <col className="w-[75%]" />

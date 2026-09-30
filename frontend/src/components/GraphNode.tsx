@@ -20,6 +20,13 @@ export interface Node {
     edgesOut: Edge[];
 }
 
+const MAX_INSTRUCTION_CHARS = 25;
+
+export const truncateInstruction = (text: string): string =>
+    text.length > MAX_INSTRUCTION_CHARS
+        ? `${text.slice(0, MAX_INSTRUCTION_CHARS)}…`
+        : text;
+
 interface GraphNodeProps {
     node: Node;
     x: number;
@@ -87,7 +94,7 @@ export const GraphNode: React.FC<GraphNodeProps> = ({
                                 }
                             }}
                         >
-                            {instr}
+                            {truncateInstruction(instr)}
                         </div>
                     );
                 })}

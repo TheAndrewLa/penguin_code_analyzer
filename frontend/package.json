@@ -1,10 +1,11 @@
 {
   "name": "penguin-analyzer",
   "private": true,
-  "version": "0.0.0",
+  "version": "0.1",
   "type": "module",
   "scripts": {
     "dev": "vite",
+    "bff": "node server/index.mjs",
     "build": "tsc && vite build",
     "preview": "vite preview"
   },

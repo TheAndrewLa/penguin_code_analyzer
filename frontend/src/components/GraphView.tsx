@@ -7,7 +7,7 @@ import React, {
 } from "react";
 
 import { Plus, Minus } from "lucide-react";
-import { Node, InstructionRegion, GraphNode } from "./GraphNode";
+import { Node, InstructionRegion, GraphNode, truncateInstruction } from "./GraphNode";
 
 interface GraphViewProps {
     nodes: Node[];
@@ -17,6 +17,8 @@ interface GraphViewProps {
         mouseY: number,
     ) => void;
     onClick: (region: InstructionRegion) => void;
+    selectedNodeId?: string | null;
+    onSelectNode?: (id: string | null) => void;
 }
 
 // Measure text width using a hidden span
@@ -58,7 +60,13 @@ interface EdgePorts {
     pathD: string;
 }
 
-export const GraphView: React.FC<GraphViewProps> = ({ nodes, onHover, onClick }) => {
+export const GraphView: React.FC<GraphViewProps> = ({
+    nodes,
+    onHover,
+    onClick,
+    selectedNodeId = null,
+    onSelectNode,
+}) => {
     const containerRef = useRef<HTMLDivElement>(null);
     const isPanning = useRef(false);
     const startPan = useRef({ x: 0, y: 0 });
@@ -73,57 +81,68 @@ export const GraphView: React.FC<GraphViewProps> = ({ nodes, onHover, onClick })
             return { nodeData: [], edgePaths: [] };
         }
 
-        // --- 1. Build graph and find entry ---
+        // --- 1. Build graph; nodes[0] is the root ---
         const nodeMap: Record<string, Node> = {};
         nodes.forEach((n) => (nodeMap[n.id] = n));
 
-        // Compute indegree
-        const indegree: Record<string, number> = {};
-        nodes.forEach((n) => (indegree[n.id] = 0));
-        nodes.forEach((n) => {
-            n.edgesOut.forEach((e) => {
-                if (nodeMap[e.to]) {
-                    indegree[e.to] = (indegree[e.to] || 0) + 1;
-                }
-            });
-        });
+        const rootId = nodes[0].id;
 
-        // Find entry: node with indegree 0 (assume unique)
-        let entryId = nodes.find((n) => indegree[n.id] === 0)?.id;
-        if (!entryId) entryId = nodes[0].id; // fallback
+        // --- 2. Keep only blocks reachable from the root ---
+        const reachable: Set<string> = new Set();
+        const bfsQueue: string[] = [rootId];
+        reachable.add(rootId);
 
-        // --- 2. BFS to assign levels (shortest distance from entry) ---
-        const level: Record<string, number> = {};
-        const visited: Record<string, boolean> = {};
-        const queue: string[] = [];
-
-        level[entryId] = 0;
-        visited[entryId] = true;
-        queue.push(entryId);
-
-        while (queue.length > 0) {
-            const currentId = queue.shift()!;
+        while (bfsQueue.length > 0) {
+            const currentId = bfsQueue.shift()!;
             const currentNode = nodeMap[currentId];
             if (!currentNode) continue;
             currentNode.edgesOut.forEach((edge) => {
                 const targetId = edge.to;
-                if (!visited[targetId] && nodeMap[targetId]) {
+                if (nodeMap[targetId] && !reachable.has(targetId)) {
+                    reachable.add(targetId);
+                    bfsQueue.push(targetId);
+                }
+            });
+        }
+
+        const nodeList = nodes.filter((n) => reachable.has(n.id));
+
+        // --- 3. BFS to assign levels (shortest distance from root) ---
+        const level: Record<string, number> = {};
+        const visited: Record<string, boolean> = {};
+
+        level[rootId] = 0;
+        visited[rootId] = true;
+        bfsQueue.length = 0;
+        bfsQueue.push(rootId);
+
+        while (bfsQueue.length > 0) {
+            const currentId = bfsQueue.shift()!;
+            const currentNode = nodeMap[currentId];
+            if (!currentNode) continue;
+            currentNode.edgesOut.forEach((edge) => {
+                const targetId = edge.to;
+                if (
+                    !visited[targetId] &&
+                    nodeMap[targetId] &&
+                    reachable.has(targetId)
+                ) {
                     visited[targetId] = true;
                     level[targetId] = level[currentId] + 1;
-                    queue.push(targetId);
+                    bfsQueue.push(targetId);
                 }
             });
         }
 
         // Assign level 0 to any unvisited nodes (should not happen)
-        nodes.forEach((n) => {
+        nodeList.forEach((n) => {
             if (level[n.id] === undefined) level[n.id] = 0;
         });
 
         // --- 3. Group nodes by level ---
         const levelGroups: Record<number, Node[]> = {};
 
-        nodes.forEach((n) => {
+        nodeList.forEach((n) => {
             const l = level[n.id] ?? 0;
             if (!levelGroups[l]) levelGroups[l] = [];
             levelGroups[l].push(n);
@@ -143,10 +162,10 @@ export const GraphView: React.FC<GraphViewProps> = ({ nodes, onHover, onClick })
             string,
             { width: number; height: number }
         > = {};
-        nodes.forEach((n) => {
+        nodeList.forEach((n) => {
             let maxInstrWidth = 0;
             n.instructions.forEach((instr) => {
-                const w = measureTextWidth(instr, font);
+                const w = measureTextWidth(truncateInstruction(instr), font);
                 if (w > maxInstrWidth) maxInstrWidth = w;
             });
             const labelWidth = measureTextWidth(n.label, labelFont);
@@ -193,7 +212,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ nodes, onHover, onClick })
         let longForwardCount = 0;
         const edges: { from: string; to: string; type: EdgeType }[] = [];
 
-        nodes.forEach((n) => {
+        nodeList.forEach((n) => {
             n.edgesOut.forEach((e) => {
                 const fromLevel = level[n.id] ?? 0;
                 const toLevel = level[e.to] ?? 0;
@@ -273,7 +292,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ nodes, onHover, onClick })
             }
         > = {};
 
-        nodes.forEach((n) => {
+        nodeList.forEach((n) => {
             sidePorts[n.id] = { bottom: [], top: [], right: [], left: [] };
         });
 
@@ -302,7 +321,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ nodes, onHover, onClick })
         });
 
         // Sort each side list for deterministic order
-        nodes.forEach((n) => {
+        nodeList.forEach((n) => {
             const id = n.id;
             Object.keys(sidePorts[id]).forEach((side) => {
                 sidePorts[id][
@@ -401,10 +420,10 @@ export const GraphView: React.FC<GraphViewProps> = ({ nodes, onHover, onClick })
 
         // Compute overall max X for right lane placement
         const maxNodeX = Math.max(
-            ...nodes.map((n) => nodePositions[n.id]?.x || 0),
+            ...nodeList.map((n) => nodePositions[n.id]?.x || 0),
         );
         const maxNodeWidth = Math.max(
-            ...nodes.map((n) => nodeDimensions[n.id]?.width || 0),
+            ...nodeList.map((n) => nodeDimensions[n.id]?.width || 0),
         );
         const maxX = maxNodeX + maxNodeWidth;
 
@@ -489,7 +508,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ nodes, onHover, onClick })
         });
 
         // --- 12. Prepare node data for rendering ---
-        const nodeData: LayoutNode[] = nodes.map((n) => ({
+        const nodeData: LayoutNode[] = nodeList.map((n) => ({
             ...n,
             x: nodePositions[n.id]?.x || 0,
             y: nodePositions[n.id]?.y || 0,
@@ -577,11 +596,12 @@ export const GraphView: React.FC<GraphViewProps> = ({ nodes, onHover, onClick })
         [scale],
     );
 
-    const [selectedNode, setSelectedNode] = useState<string | null>(null);
-
-    const handleNodeSelect = useCallback((id: string) => {
-        setSelectedNode((prev) => (prev === id ? null : id));
-    }, []);
+    const handleNodeSelect = useCallback(
+        (id: string) => {
+            onSelectNode?.(selectedNodeId === id ? null : id);
+        },
+        [selectedNodeId, onSelectNode],
+    );
 
     const handleInstructionHover = useCallback(
         (region: InstructionRegion | null, e: React.MouseEvent) => {
@@ -620,7 +640,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ nodes, onHover, onClick })
                 }}
             >
                 {/* SVG for edges */}
-                <svg className="absolute top-0 left-0 w-full h-full pointer-events-none">
+                <svg className="absolute top-0 left-0 w-full h-full pointer-events-none overflow-visible">
                     <defs>
                         <marker
                             id="arrow-black"
@@ -676,7 +696,7 @@ export const GraphView: React.FC<GraphViewProps> = ({ nodes, onHover, onClick })
                         height={node.height}
                         onInstructionHover={handleInstructionHover}
                         onInstructionClick={handleInstructionClick}
-                        selected={selectedNode == node.id}
+                        selected={selectedNodeId === node.id}
                         onSelect={() => handleNodeSelect(node.id)}
                     />
                 ))}

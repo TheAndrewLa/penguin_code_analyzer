@@ -13,8 +13,8 @@ export interface TimelineEntry {
     instrIndex: number;
     dispatchCycles: number[];
     waitQueueCycles: number[];
-    execCycles: number[];
-    execEndCycles: number[];
+    executeCycles: number[];
+    executeEndCycles: number[];
     waitRetireCycles: number[];
     retireCycles: number[];
 }
@@ -40,8 +40,8 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             const entryMax = Math.max(
                 ...entry.dispatchCycles,
                 ...entry.waitQueueCycles,
-                ...entry.execCycles,
-                ...entry.execEndCycles,
+                ...entry.executeCycles,
+                ...entry.executeEndCycles,
                 ...entry.waitRetireCycles,
                 ...entry.retireCycles,
             );
@@ -64,10 +64,10 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 } else if (entry.waitQueueCycles.includes(c)) {
                     label = "=";
                     bgStyle = "bg-orange-200 border border-black";
-                } else if (entry.execCycles.includes(c)) {
+                } else if (entry.executeCycles.includes(c)) {
                     label = "e";
                     bgStyle = "bg-emerald-200 border border-black";
-                } else if (entry.execEndCycles.includes(c)) {
+                } else if (entry.executeEndCycles.includes(c)) {
                     label = "E";
                     bgStyle = "bg-emerald-400 border border-black";
                 } else if (entry.waitRetireCycles.includes(c)) {
@@ -177,7 +177,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
             }}
         >
             <div
-                className="absolute top-0 left-0 p-5 select-none"
+                className="absolute top-0 left-0 select-none"
                 style={{
                     transform: `translate(${offset.x}px, ${offset.y}px) scale(${scale})`,
                     transformOrigin: "0 0",

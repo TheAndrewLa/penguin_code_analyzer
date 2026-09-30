@@ -2,17 +2,23 @@ import React from "react";
 import * as Dialog from "@radix-ui/react-dialog";
 import { X } from "lucide-react";
 import { InstructionRegion } from "@/types";
+import type { FullInstructionInfo } from "../api/client";
 
 interface InstructionModalProps {
     region: InstructionRegion | null;
+    info?: FullInstructionInfo | null;
     onClose: () => void;
 }
 
 const InstructionModal: React.FC<InstructionModalProps> = ({
     region,
+    info,
     onClose,
 }) => {
     if (!region) return null;
+
+    const bytesHex = info ? info.bytes.map((byte) => byte.toString(16).padStart(2, "0")).join(" ") : "";
+
     return (
         <Dialog.Root
             open={!!region}
@@ -28,12 +34,31 @@ const InstructionModal: React.FC<InstructionModalProps> = ({
                         <strong>Instruction reference</strong>
                         <pre className="mt-2 bg-gray-100 p-4 rounded-lg overflow-x-auto font-mono text-sm">
                             {region.instrText}
-                            {"\n"}Intel® 64 and IA-32 Architectures Software
-                            Developer’s Manual
-                            {"\n"}Vol. 2A 3-XXX
-                            {"\n"}Opcode: ...
-                            {"\n"}Description: ...
-                            {"\n"}Flags affected: OF,SF,ZF,AF,PF,CF
+                            {"\n"}
+                            {info ? (
+                                <>
+                                    {"\n"}
+                                    {`Latency: ${info.latency}`}
+                                    {"\n"}
+                                    {`uOps: ${info.uOps}`}
+                                    {"\n"}
+                                    {`Reciprocal throughput: ${info.rThroughput}`}
+                                    {"\n"}
+                                    {`Opcode: ${info.opcode}`}
+                                    {"\n"}
+                                    {`Bytes: ${bytesHex}`}
+                                </>
+                            ) : (
+                                <>
+                                    {"\n"}
+                                    Intel® 64 and IA-32 Architectures Software
+                                    Developer’s Manual
+                                    {"\n"}Vol. 2A 3-XXX
+                                    {"\n"}Opcode: ...
+                                    {"\n"}Description: ...
+                                    {"\n"}Flags affected: OF,SF,ZF,AF,PF,CF
+                                </>
+                            )}
                         </pre>
                     </div>
                     <Dialog.Close asChild>

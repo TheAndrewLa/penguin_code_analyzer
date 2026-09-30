@@ -26,7 +26,6 @@ export const SimulateToolbar: React.FC<SimulateToolbarProps> = ({
     const tabs = [
         SimulateTab.General,
         SimulateTab.Instruction,
-        SimulateTab.Pressure,
         SimulateTab.Timeline,
     ];
 

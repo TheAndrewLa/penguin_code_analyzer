@@ -1,35 +1,53 @@
-import React, { useState } from "react";
+import React from "react";
 import SelectField from "./primitives/SelectField";
 
 interface GraphToolbarProps {
+    functions: string[];
+    selectedFunction: string;
+    onFunctionChange: (func: string) => void;
+    uArch: string;
+    uArchOptions: string[];
+    onUArchChange: (uArch: string) => void;
     onSimulate: () => void;
+    graphLoaded: boolean;
+    blockSelected: boolean;
+    simulating: boolean;
 }
 
-export const GraphToolbar: React.FC<GraphToolbarProps> = ({ onSimulate }) => {
-    const [uArch, setUArch] = useState("Haswell");
-    const [func, setFunc] = useState("fib(int)");
-
-    const uArchOptions = ["Haswell", "Rocket Lake", "AMD Zen"];
-    const funcOptions = ["fib(int)", "concat(char*)"];
-
+export const GraphToolbar: React.FC<GraphToolbarProps> = ({
+    functions,
+    selectedFunction,
+    onFunctionChange,
+    uArch,
+    uArchOptions,
+    onUArchChange,
+    onSimulate,
+    graphLoaded,
+    blockSelected,
+    simulating,
+}) => {
     return (
         <div className="flex items-center justify-between gap-3 px-4 h-12 bg-white border-b border-gray-200 flex-shrink-0">
             <div className="flex items-center gap-2">
-                <SelectField
-                    value={func}
-                    onChange={setFunc}
-                    options={funcOptions}
-                />
+                {graphLoaded && (
+                    <SelectField
+                        value={selectedFunction}
+                        onChange={onFunctionChange}
+                        options={functions}
+                    />
+                )}
             </div>
             <div className="flex gap-2">
                 <SelectField
                     value={uArch}
-                    onChange={setUArch}
+                    onChange={onUArchChange}
                     options={uArchOptions}
+                    disabled={!graphLoaded}
                 />
                 <button
-                    className="px-3 py-1 text-base font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                    className="px-3 py-1 text-base font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     onClick={onSimulate}
+                    disabled={!graphLoaded || !blockSelected || simulating}
                 >
                     Simulate
                 </button>

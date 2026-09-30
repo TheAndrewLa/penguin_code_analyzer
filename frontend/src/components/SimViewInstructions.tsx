@@ -31,7 +31,7 @@ export const InstructionInfoView: React.FC<InstructionInfoViewProps> = ({
     ];
 
     return (
-        <div className="p-5 overflow-auto text-base">
+        <div className="overflow-auto text-base">
             <table className="table-fixed border-collapse w-full">
                 <colgroup>
                     <col className="w-[30%]" />
