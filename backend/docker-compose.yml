@@ -1,0 +1,43 @@
+services:
+  instruction_service:
+    build:
+      context: ./instruction_service
+      dockerfile: Dockerfile
+    image: instruction_service:latest
+    container_name: instruction_service
+    restart: unless-stopped
+    ports:
+      - "${PORT_INSTRUCTION_SERVICE}:${PORT_INSTRUCTION_SERVICE}"
+    command: ["--port", "${PORT_INSTRUCTION_SERVICE}"]
+    networks:
+      - services
+
+  simulate_service:
+    build:
+      context: ./simulate_service
+      dockerfile: Dockerfile
+    image: simulate_service:latest
+    container_name: simulate_service
+    restart: unless-stopped
+    ports:
+      - "${PORT_SIMULATE_SERVICE}:${PORT_SIMULATE_SERVICE}"
+    command: ["--port", "${PORT_SIMULATE_SERVICE}"]
+    networks:
+      - services
+
+  graph_service:
+    build:
+      context: ./graph_service
+      dockerfile: Dockerfile
+    image: graph_service:latest
+    container_name: graph_service
+    restart: unless-stopped
+    ports:
+      - "${PORT_GRAPH_SERVICE}:${PORT_GRAPH_SERVICE}"
+    command: ["--port", "${PORT_GRAPH_SERVICE}"]
+    networks:
+      - services
+
+networks:
+  services:
+    driver: bridge
