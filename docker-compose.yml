@@ -1,7 +1,7 @@
 services:
   instruction_service:
     build:
-      context: ./instruction_service
+      context: ./backend/instruction_service
       dockerfile: Dockerfile
     image: instruction_service:latest
     container_name: instruction_service
@@ -14,7 +14,7 @@ services:
 
   simulate_service:
     build:
-      context: ./simulate_service
+      context: ./backend/simulate_service
       dockerfile: Dockerfile
     image: simulate_service:latest
     container_name: simulate_service
@@ -27,7 +27,7 @@ services:
 
   graph_service:
     build:
-      context: ./graph_service
+      context: ./backend/graph_service
       dockerfile: Dockerfile
     image: graph_service:latest
     container_name: graph_service
@@ -35,6 +35,19 @@ services:
     ports:
       - "${PORT_GRAPH_SERVICE}:${PORT_GRAPH_SERVICE}"
     command: ["--port", "${PORT_GRAPH_SERVICE}"]
+    networks:
+      - services
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    image: frontend:latest
+    container_name: frontend
+    restart: unless-stopped
+    ports:
+      - "${PORT_BFF}:${PORT_BFF}"
+    command: []
     networks:
       - services
 
