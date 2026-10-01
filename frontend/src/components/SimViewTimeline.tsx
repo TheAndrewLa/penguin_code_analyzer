@@ -207,7 +207,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                 </div>
             </div>
 
-            <div className="absolute z-20 bottom-4 right-4 flex items-center gap-1 bg-white border border-gray-200 rounded-lg p-2 shadow-md">
+            <div className="absolute z-20 bottom-4 right-4 flex items-center gap-1 bg-white border border-gray-400 rounded-lg p-2 shadow-md">
                 <button onClick={zoomOut} title="Zoom out">
                     <Minus />
                 </button>
