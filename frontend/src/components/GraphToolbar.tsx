@@ -45,7 +45,7 @@ export const GraphToolbar: React.FC<GraphToolbarProps> = ({
                     disabled={!graphLoaded}
                 />
                 <button
-                    className="px-3 py-1 text-base font-medium text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-base font-medium text-gray-900 bg-ember rounded-md hover:brightness-95 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     onClick={onSimulate}
                     disabled={!graphLoaded || !blockSelected || simulating}
                 >

@@ -82,7 +82,7 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({
                         key={tab.id}
                         className={`flex items-center gap-1 px-3 py-1 rounded cursor-pointer border-2 whitespace-nowrap ${
                             activeId === tab.id
-                                ? "bg-white border-blue-600 font-semibold"
+                                ? "bg-white border-ember font-semibold"
                                 : "bg-gray-200 border-transparent hover:bg-gray-300/70"
                         }`}
                         onClick={() => onSelect(tab.id)}
@@ -159,7 +159,7 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({
                                         onChange={(e) =>
                                             onFileNameChanged(e.target.value)
                                         }
-                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-blue-500"
+                                        className="w-full px-2 py-1 text-sm border border-gray-300 rounded focus:outline-none focus:ring-1 focus:ring-ember"
                                         placeholder="main"
                                         autoFocus
                                         onKeyDown={(e) => {
@@ -174,10 +174,10 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({
                                     disabled={
                                         isLimitReached || !newFileName.trim()
                                     }
-                                    className={`w-full py-1 text-sm font-medium text-white rounded ${
+                                    className={`w-full py-1 text-sm font-medium text-gray-900 rounded ${
                                         isLimitReached || !newFileName.trim()
                                             ? "bg-gray-400 cursor-not-allowed"
-                                            : "bg-blue-600 hover:bg-blue-700"
+                                            : "bg-ember hover:brightness-95"
                                     }`}
                                 >
                                     {isLimitReached ? "Limit reached" : "Add"}
@@ -212,7 +212,7 @@ export const EditorTabs: React.FC<EditorTabsProps> = ({
                 </button>
 
                 <button
-                    className="px-3 py-1 text-white bg-blue-600 rounded-md hover:bg-blue-700 disabled:bg-gray-400 disabled:cursor-not-allowed"
+                    className="px-3 py-1 text-gray-900 bg-ember rounded-md hover:brightness-95 disabled:bg-gray-400 disabled:cursor-not-allowed"
                     onClick={onCompile}
                     disabled={locked}
                 >

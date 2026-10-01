@@ -36,7 +36,7 @@ export const SimulateToolbar: React.FC<SimulateToolbarProps> = ({
                     <div
                         className={`px-3 py-1 rounded cursor-pointer border-2 text-base overflow-hidden text-nowrap ${
                             i === tab
-                                ? "bg-white border-blue-600 font-semibold"
+                                ? "bg-white border-ember font-semibold"
                                 : "bg-gray-200 border-transparent hover:bg-gray-300/70"
                         }`}
                         onClick={() => handleTab(i)}

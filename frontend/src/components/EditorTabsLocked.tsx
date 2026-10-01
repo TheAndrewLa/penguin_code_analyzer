@@ -21,7 +21,7 @@ const EditorTabsLocked: React.FC<EditorTabsLockedProps> = ({
                         key={tab.id}
                         className={`flex items-center gap-1 px-3 py-1 rounded cursor-pointer border-2 whitespace-nowrap ${
                             activeId === tab.id
-                                ? "bg-white border-blue-600 font-semibold"
+                                ? "bg-white border-ember font-semibold"
                                 : "bg-gray-200 border-transparent hover:bg-gray-300/70"
                         }`}
                     >
@@ -30,7 +30,7 @@ const EditorTabsLocked: React.FC<EditorTabsLockedProps> = ({
                 ))}
             </div>
             <button
-                className="flex flex-row gap-2 items-center px-3 py-1 text-base text-white bg-blue-600 rounded-md hover:bg-blue-700"
+                className="flex flex-row gap-2 items-center px-3 py-1 text-base text-gray-900 bg-ember rounded-md hover:brightness-95"
                 onClick={onBack}
             >
                 Back to editor

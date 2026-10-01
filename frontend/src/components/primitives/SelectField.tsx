@@ -18,7 +18,7 @@ const SelectField: React.FC<SelectFieldProps> = ({
     return (
         <Select.Root value={value} onValueChange={onChange} disabled={disabled}>
             <Select.Trigger
-                className={`inline-flex items-center justify-between gap-2 px-3 py-1 bg-white border border-gray-300 rounded-md text-base shadow-sm focus:outline-none focus:ring-1 focus:ring-blue-500 w-auto ${
+                className={`inline-flex items-center justify-between gap-2 px-3 py-1 bg-white border border-gray-300 rounded-md text-base shadow-sm focus:outline-none focus:ring-1 focus:ring-ember w-auto ${
                     disabled
                         ? "opacity-50 cursor-not-allowed"
                         : "hover:bg-gray-50"
@@ -36,7 +36,7 @@ const SelectField: React.FC<SelectFieldProps> = ({
                             <Select.Item
                                 key={opt}
                                 value={opt}
-                                className="px-3 py-1 text-sm hover:bg-blue-50 rounded cursor-pointer"
+                                className="px-3 py-1 text-sm hover:bg-gray-100 rounded cursor-pointer"
                             >
                                 <Select.ItemText>{opt}</Select.ItemText>
                             </Select.Item>

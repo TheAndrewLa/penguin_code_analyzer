@@ -59,7 +59,7 @@ export const GraphNode: React.FC<GraphNodeProps> = ({
     return (
         <div
             className={`absolute bg-white rounded-sm select-none cursor-pointer ${
-                selected ? "border-2 border-blue-500" : "border border-black"
+                selected ? "border-2 border-ember" : "border border-black"
             }`}
             style={{ left: x, top: y, width, height }}
             onClick={(e) => {
