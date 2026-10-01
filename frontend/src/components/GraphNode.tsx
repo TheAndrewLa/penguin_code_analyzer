@@ -43,6 +43,7 @@ interface GraphNodeProps {
     ) => void;
     onSelect: (e: React.MouseEvent) => void;
     selected?: boolean;
+    onNodeHover: (id: string | null) => void;
 }
 
 export const GraphNode: React.FC<GraphNodeProps> = ({
@@ -55,6 +56,7 @@ export const GraphNode: React.FC<GraphNodeProps> = ({
     onInstructionClick,
     onSelect,
     selected = false,
+    onNodeHover,
 }) => {
     return (
         <div
@@ -68,6 +70,8 @@ export const GraphNode: React.FC<GraphNodeProps> = ({
                     onSelect(e);
                 }
             }}
+            onMouseEnter={() => onNodeHover?.(node.id)}
+            onMouseLeave={() => onNodeHover?.(null)}
         >
             <div className="font-bold text-lg px-2 py-1 font-sans">
                 {node.label}
