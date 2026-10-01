@@ -441,8 +441,13 @@ function App() {
                     ) : (
                         <>
                             {compileError && (
-                                <div className="px-3 py-2 bg-red-100 text-red-700 text-sm border-b border-red-200 whitespace-pre-wrap">
-                                    Compile error!
+                                <div className="px-3 py-2 bg-red-100 text-red-800 text-sm border-b border-red-200">
+                                    <div className="font-semibold">
+                                        Compile error
+                                    </div>
+                                    <pre className="mt-1 whitespace-pre-wrap font-mono text-xs leading-relaxed">
+                                        {compileError.trim()}
+                                    </pre>
                                 </div>
                             )}
                             <GraphToolbar
@@ -465,8 +470,13 @@ function App() {
                                 onSelectNode={setSelectedBlockId}
                             />
                             {simulateError && (
-                                <div className="px-3 py-2 bg-red-100 text-red-700 text-sm border-t border-red-200 whitespace-pre-wrap">
-                                    Simulation error!
+                                <div className="px-3 py-2 bg-red-100 text-red-800 text-sm border-t border-red-200">
+                                    <div className="font-semibold">
+                                        Simulation error
+                                    </div>
+                                    <pre className="mt-1 whitespace-pre-wrap font-mono text-xs leading-relaxed">
+                                        {simulateError.trim()}
+                                    </pre>
                                 </div>
                             )}
                         </>
