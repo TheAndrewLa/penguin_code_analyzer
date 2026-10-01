@@ -2,7 +2,7 @@ import { execFile } from "node:child_process";
 import { existsSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:http";
 import { tmpdir } from "node:os";
-import { dirname, extname, join, normalize } from "node:path";
+import { basename, dirname, extname, join, normalize } from "node:path";
 import { fileURLToPath } from "node:url";
 import { promisify } from "node:util";
 
@@ -122,6 +122,24 @@ function splitFlags(flags) {
         .filter((flag) => flag.length > 0);
 }
 
+const DEFAULT_SOURCE_NAME = "main.c";
+
+// The tab name comes from a free-text input, so it must not be able to escape
+// the temporary directory, and it must never start with "-" or the compiler
+// would take it for an option instead of an input file.
+function sanitizeSourceName(filename) {
+    const stem = basename(String(filename ?? ""))
+        .trim()
+        .replace(/\.[^.]*$/, "");
+
+    const safeStem = stem
+        .replace(/[^A-Za-z0-9._-]/g, "_")
+        .replace(/^[^A-Za-z0-9]+/, "")
+        .slice(0, 64);
+
+    return safeStem.length > 0 ? `${safeStem}.c` : DEFAULT_SOURCE_NAME;
+}
+
 function normalizeBrief(body) {
     const value = body ?? {};
     return {
@@ -160,7 +178,7 @@ function writeFile(res, filePath) {
 
 async function handleGraphStart(req, res) {
     const body = await readJsonBody(req);
-    const { source, compiler, flags } = body;
+    const { source, compiler, flags, filename } = body;
 
     if (typeof source !== "string" || source.length === 0) {
         writeJson(res, 400, { error: "Field 'source' is required" });
@@ -171,9 +189,9 @@ async function handleGraphStart(req, res) {
     const dir = mkdtempSync(join(tmpdir(), "penguin-compile-"));
 
     try {
-        const srcPath = join(dir, "main.c");
+        const srcName = sanitizeSourceName(filename);
         const objPath = join(dir, "out.o");
-        writeFileSync(srcPath, source);
+        writeFileSync(join(dir, srcName), source);
 
         const bin = toolchain.cc;
         const args = [];
@@ -182,10 +200,12 @@ async function handleGraphStart(req, res) {
             args.push("--target=x86_64-unknown-linux-gnu");
         }
 
-        args.push("-c", "-o", objPath, ...splitFlags(flags), srcPath);
+        args.push("-c", "-o", objPath, ...splitFlags(flags), srcName);
 
         try {
-            await execFileAsync(bin, args, { maxBuffer: 32 * 1024 * 1024 });
+            // Compiling with cwd set to the temp directory keeps the temporary
+            // path out of the diagnostics, so gcc reports just "main.c:2:12:".
+            await execFileAsync(bin, args, { cwd: dir, maxBuffer: 32 * 1024 * 1024 });
         } catch (err) {
             const message = err?.stderr ? String(err.stderr) : err?.message ?? "Compilation failed";
             writeJson(res, 400, { error: message });
