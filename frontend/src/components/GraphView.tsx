@@ -7,7 +7,12 @@ import React, {
 } from "react";
 
 import { Plus, Minus } from "lucide-react";
-import { Node, InstructionRegion, GraphNode, truncateInstruction } from "./GraphNode";
+import {
+    Node,
+    InstructionRegion,
+    GraphNode,
+    truncateInstruction,
+} from "./GraphNode";
 
 interface GraphViewProps {
     nodes: Node[];
@@ -39,6 +44,16 @@ enum EdgeType {
     Adjacent = "adjacent",
     Back = "back",
     LongForward = "longForward",
+}
+
+interface EdgePath {
+    key: string;
+    from: string;
+    to: string;
+    type: EdgeType;
+    d: string;
+    color: string;
+    markerEnd: string;
 }
 
 interface LayoutNode extends Node {
@@ -75,10 +90,16 @@ export const GraphView: React.FC<GraphViewProps> = ({
     const [scale, setScale] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
 
+    // Internal state for hovered node
+    const [hoveredNode, setHoveredNode] = useState<string | null>(null);
+
     // Main layout computation
     const layout = useMemo(() => {
         if (!nodes || nodes.length === 0) {
-            return { nodeData: [], edgePaths: [] };
+            return {
+                nodeData: [] as LayoutNode[],
+                edgePaths: [] as EdgePath[],
+            };
         }
 
         // --- 1. Build graph; nodes[0] is the root ---
@@ -398,7 +419,7 @@ export const GraphView: React.FC<GraphViewProps> = ({
         });
 
         // --- 11. Build edge paths with arrows ---
-        const edgePaths: { d: string; color: string; markerEnd: string }[] = [];
+        const edgePaths: EdgePath[] = [];
 
         // Helper to get color and marker id
         const getEdgeStyle = (
@@ -446,17 +467,20 @@ export const GraphView: React.FC<GraphViewProps> = ({
             const srcPort = ports.sourcePort;
             const tgtPort = ports.targetPort; // now target is top side
 
-            // Path: down from source port to bottomY+15, right to lane, up to target port y (top), left to target port
             const d =
                 `M ${srcPort.x} ${srcPort.y} ` +
-                `L ${srcPort.x} ${bottomY + 15} ` +
-                `L ${laneX} ${bottomY + 15} ` +
-                `L ${laneX} ${tgtPort.y - 15} ` +
-                `L ${tgtPort.x} ${tgtPort.y - 15}` +
+                `L ${srcPort.x} ${bottomY + 12} ` +
+                `L ${laneX} ${bottomY + 12} ` +
+                `L ${laneX} ${tgtPort.y - 12} ` +
+                `L ${tgtPort.x} ${tgtPort.y - 12}` +
                 `L ${tgtPort.x} ${tgtPort.y}`;
 
             const style = getEdgeStyle(edge.from, edge.to);
             edgePaths.push({
+                key,
+                from: edge.from,
+                to: edge.to,
+                type: EdgeType.Back,
                 d,
                 color: style.color,
                 markerEnd: `url(#${style.markerId})`,
@@ -486,6 +510,10 @@ export const GraphView: React.FC<GraphViewProps> = ({
                 `L ${tgtPort.x} ${tgtPort.y}`;
             const style = getEdgeStyle(edge.from, edge.to);
             edgePaths.push({
+                key,
+                from: edge.from,
+                to: edge.to,
+                type: EdgeType.LongForward,
                 d,
                 color: style.color,
                 markerEnd: `url(#${style.markerId})`,
@@ -498,13 +526,17 @@ export const GraphView: React.FC<GraphViewProps> = ({
             const key = edge.from + "->" + edge.to;
             const ports = edgePorts[key];
             if (!ports) return;
-            const d = `M ${ports.sourcePort.x} ${ports.sourcePort.y} ` +
-                `L ${ports.sourcePort.x} ${ports.sourcePort.y + 10} ` +
-                `L ${ports.targetPort.x} ${ports.sourcePort.y + 10}` +
-                `L ${ports.targetPort.x} ${ports.targetPort.y - 10}` +
+            const d =
+                `M ${ports.sourcePort.x} ${ports.sourcePort.y} ` +
+                `L ${ports.sourcePort.x} ${ports.targetPort.y - 25} ` +
+                `L ${ports.targetPort.x} ${ports.targetPort.y - 25}` +
                 `L ${ports.targetPort.x} ${ports.targetPort.y}`;
             const style = getEdgeStyle(edge.from, edge.to);
             edgePaths.push({
+                key,
+                from: edge.from,
+                to: edge.to,
+                type: EdgeType.Adjacent,
                 d,
                 color: style.color,
                 markerEnd: `url(#${style.markerId})`,
@@ -625,6 +657,18 @@ export const GraphView: React.FC<GraphViewProps> = ({
         [onClick],
     );
 
+    const isEdgeHighlighted = (edge: EdgePath) =>
+        hoveredNode !== null &&
+        (edge.from === hoveredNode || edge.to === hoveredNode);
+
+    const normalEdges = layout.edgePaths.filter(
+        (edge) => !isEdgeHighlighted(edge),
+    );
+
+    const highlightedEdges = layout.edgePaths.filter((edge) =>
+        isEdgeHighlighted(edge),
+    );
+
     return (
         <div
             ref={containerRef}
@@ -677,15 +721,29 @@ export const GraphView: React.FC<GraphViewProps> = ({
                             <path d="M 0 0 L 6 3 L 0 6 z" fill="#992017" />
                         </marker>
                     </defs>
-                    {layout.edgePaths.map((edge, idx) => (
-                        <path
-                            key={idx}
-                            d={edge.d}
-                            stroke={edge.color}
-                            strokeWidth={1.5}
-                            fill="none"
-                            markerEnd={edge.markerEnd}
-                        />
+                    <g opacity={hoveredNode ? 0.25 : 1}>
+                        {normalEdges.map((edge) => (
+                            <path
+                                key={edge.key}
+                                d={edge.d}
+                                stroke={edge.color}
+                                strokeWidth={1.5}
+                                fill="none"
+                                markerEnd={edge.markerEnd}
+                            />
+                        ))}
+                    </g>
+
+                    {highlightedEdges.map((edge) => (
+                        <g key={edge.key}>
+                            <path
+                                d={edge.d}
+                                stroke={edge.color}
+                                strokeWidth={1.75}
+                                fill="none"
+                                markerEnd={edge.markerEnd}
+                            />
+                        </g>
                     ))}
                 </svg>
 
@@ -702,6 +760,7 @@ export const GraphView: React.FC<GraphViewProps> = ({
                         onInstructionClick={handleInstructionClick}
                         selected={selectedNodeId === node.id}
                         onSelect={() => handleNodeSelect(node.id)}
+                        onNodeHover={setHoveredNode}
                     />
                 ))}
             </div>
