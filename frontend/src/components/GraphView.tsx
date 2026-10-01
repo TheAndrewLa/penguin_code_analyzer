@@ -498,7 +498,11 @@ export const GraphView: React.FC<GraphViewProps> = ({
             const key = edge.from + "->" + edge.to;
             const ports = edgePorts[key];
             if (!ports) return;
-            const d = `M ${ports.sourcePort.x} ${ports.sourcePort.y} L ${ports.targetPort.x} ${ports.targetPort.y}`;
+            const d = `M ${ports.sourcePort.x} ${ports.sourcePort.y} ` +
+                `L ${ports.sourcePort.x} ${ports.sourcePort.y + 10} ` +
+                `L ${ports.targetPort.x} ${ports.sourcePort.y + 10}` +
+                `L ${ports.targetPort.x} ${ports.targetPort.y - 10}` +
+                `L ${ports.targetPort.x} ${ports.targetPort.y}`;
             const style = getEdgeStyle(edge.from, edge.to);
             edgePaths.push({
                 d,
