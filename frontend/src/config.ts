@@ -48,4 +48,17 @@ export const cpuByDisplayName: Record<string, string> = {
     "AMD Zen 6": "znver6",
 };
 
-export const compilers = ["gcc 13.2", "clang 22.0"]; // TODO: finish
+export const compilers = [
+    "gcc 11.5",
+    "gcc 12.4",
+    "gcc 13.3",
+    "gcc 14.3",
+    "gcc 15.2",
+    "clang 19.1",
+    "clang 20.1",
+    "clang 21.1",
+    "clang 22.1",
+    "clang 23.1",
+];
+
+export const DEFAULT_COMPILER = "gcc 15.2";

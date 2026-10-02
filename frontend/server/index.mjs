@@ -17,13 +17,19 @@ const GRAPH_SERVICE = process.env.GRAPH_SERVICE_URL ?? "http://localhost:9000";
 
 const MAX_BODY_SIZE = 16 * 1024 * 1024;
 
+const DEFAULT_COMPILER = "gcc 15.2";
+
 const COMPILER_CONFIG = {
-    "gcc 13.2": {
-        cc: process.env.GCC_CC ?? "gcc",
-    },
-    "clang 22.0": {
-        cc: process.env.CLANG_CC ?? "clang",
-    },
+    "gcc 11.5": { cc: process.env.GCC_11_5_CC ?? "/usr/bin/gcc-11" },
+    "gcc 12.4": { cc: process.env.GCC_12_4_CC ?? "/usr/bin/gcc-12" },
+    "gcc 13.3": { cc: process.env.GCC_13_3_CC ?? "/usr/bin/gcc-13" },
+    "gcc 14.3": { cc: process.env.GCC_14_3_CC ?? "/usr/bin/gcc-14" },
+    "gcc 15.2": { cc: process.env.GCC_15_2_CC ?? "/usr/bin/gcc-15" },
+    "clang 19.1": { cc: process.env.CLANG_19_1_CC ?? "/usr/bin/clang-19" },
+    "clang 20.1": { cc: process.env.CLANG_20_1_CC ?? "/usr/bin/clang-20" },
+    "clang 21.1": { cc: process.env.CLANG_21_1_CC ?? "/usr/bin/clang-21" },
+    "clang 22.1": { cc: process.env.CLANG_22_1_CC ?? "/usr/bin/clang-22" },
+    "clang 23.1": { cc: process.env.CLANG_23_1_CC ?? "/usr/bin/clang-23" },
 };
 
 const MIME_TYPES = {
@@ -185,7 +191,9 @@ async function handleGraphStart(req, res) {
         return;
     }
 
-    const toolchain = COMPILER_CONFIG[String(compiler ?? "")] ?? COMPILER_CONFIG["gcc 13.2"];
+    const toolchain =
+        COMPILER_CONFIG[String(compiler ?? "")] ??
+        COMPILER_CONFIG[DEFAULT_COMPILER];
     const dir = mkdtempSync(join(tmpdir(), "penguin-compile-"));
 
     try {

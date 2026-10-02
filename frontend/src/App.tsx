@@ -16,7 +16,12 @@ import {
     InstructionInfoView,
 } from "./components/SimViewInstructions";
 import { GraphToolbar } from "./components/GraphToolbar";
-import { compilers, cpuByDisplayName, uArchOptions } from "./config";
+import {
+    compilers,
+    cpuByDisplayName,
+    DEFAULT_COMPILER,
+    uArchOptions,
+} from "./config";
 import {
     BriefInstructionInfo,
     FullInstructionInfo,
@@ -57,7 +62,7 @@ function App() {
     const [activeEditorTabId, setActiveEditorTabId] = useState<number>(1);
     const nextEditorTabId = useRef(2);
 
-    const [compiler, setCompiler] = useState(compilers[0]);
+    const [compiler, setCompiler] = useState(DEFAULT_COMPILER);
     const [compileFlags, setCompileFlags] = useState("");
     const [isCompileModalOpen, setCompileModalOpen] = useState(false);
     const [isCompiling, setIsCompiling] = useState(false);

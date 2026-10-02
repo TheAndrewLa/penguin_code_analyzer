@@ -18,15 +18,32 @@ ENV DEBIAN_FRONTEND=noninteractive \
     BFF_PORT=3000 \
     INSTRUCTION_SERVICE_URL=http://instruction_service:8080 \
     SIMULATE_SERVICE_URL=http://simulate_service:8090 \
-    GRAPH_SERVICE_URL=http://graph_service:9000 \
-    GCC_CC=/usr/bin/gcc \
-    CLANG_CC=/usr/bin/clang-19
+    GRAPH_SERVICE_URL=http://graph_service:9000
 
 RUN apt-get update && apt-get install -y --no-install-recommends \
     wget \
-    build-essential \
+    gnupg \
+    software-properties-common \
+    libc6-dev \
+    && add-apt-repository -y ppa:ubuntu-toolchain-r/test \
+    && wget -qO- https://apt.llvm.org/llvm-snapshot.gpg.key \
+    | gpg --dearmor -o /etc/apt/trusted.gpg.d/llvm.gpg \
+    && echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-19 main" > /etc/apt/sources.list.d/llvm-19.list \
+    && echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-20 main" > /etc/apt/sources.list.d/llvm-20.list \
+    && echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-21 main" > /etc/apt/sources.list.d/llvm-21.list \
+    && echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-22 main" > /etc/apt/sources.list.d/llvm-22.list \
+    && echo "deb http://apt.llvm.org/noble/ llvm-toolchain-noble-23 main" > /etc/apt/sources.list.d/llvm-23.list \
+    && apt-get update && apt-get install -y --no-install-recommends \
+    gcc-11 \
+    gcc-12 \
+    gcc-13 \
+    gcc-14 \
+    gcc-15 \
     clang-19 \
-    && ln -s /usr/bin/clang-19 /usr/local/bin/clang \
+    clang-20 \
+    clang-21 \
+    clang-22 \
+    clang-23 \
     && rm -rf /var/lib/apt/lists/*
 
 RUN wget https://deb.nodesource.com/setup_22.x --no-check-certificate \
