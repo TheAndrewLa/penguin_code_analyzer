@@ -10,6 +10,9 @@ interface GeneralViewProps {
     blockRThroughput: number;
 }
 
+const formatRate = (value: number) =>
+    Number.isInteger(value) ? String(value) : value.toFixed(3);
+
 export const GeneralView: React.FC<GeneralViewProps> = ({
     iterations,
     instructions,
@@ -24,8 +27,8 @@ export const GeneralView: React.FC<GeneralViewProps> = ({
         { label: "Instructions", value: instructions },
         { label: "Total cycles", value: totalCycles },
         { label: "Total μOps", value: totalMicroOps },
-        { label: "μOps / cycle", value: uOpsPerCycle },
-        { label: "IPC", value: instructionsPerCycle },
+        { label: "μOps / cycle", value: formatRate(uOpsPerCycle) },
+        { label: "IPC", value: formatRate(instructionsPerCycle) },
         { label: "Block reciprocal throughput", value: blockRThroughput },
     ];
 
