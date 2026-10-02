@@ -14,7 +14,7 @@ A machine code analyzer
 - Aggregate stats: total cycles, IPC, μOps / cycle
 - Pipeline timeline for simulated blocks
 - Microarchitecture presets: Haswell, Skylake, Ice Lake,
-  Rocket Lake, Zen 2, Zen 3
+  Rocket Lake, Zen 1, Zen 3, etc
 - Compile and simulation errors reported inline
 
 #### Build & Run
