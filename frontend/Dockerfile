@@ -4,7 +4,8 @@ FROM node:22-bookworm-slim AS build
 WORKDIR /app
 
 COPY package.json package-lock.json ./
-RUN npm ci
+RUN npm install \
+    && npm ci
 
 COPY index.html tsconfig.json vite.config.ts postcss.config.js tailwind.config.js ./
 COPY public ./public
