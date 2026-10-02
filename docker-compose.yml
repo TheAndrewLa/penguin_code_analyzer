@@ -6,7 +6,7 @@ services:
     image: instruction_service:latest
     container_name: instruction_service
     restart: unless-stopped
-    ports:
+    expose:
       - "${PORT_INSTRUCTION_SERVICE}"
     command: ["--port", "${PORT_INSTRUCTION_SERVICE}"]
     networks:
@@ -19,7 +19,7 @@ services:
     image: simulate_service:latest
     container_name: simulate_service
     restart: unless-stopped
-    ports:
+    expose:
       - "${PORT_SIMULATE_SERVICE}"
     command: ["--port", "${PORT_SIMULATE_SERVICE}"]
     networks:
@@ -32,7 +32,7 @@ services:
     image: graph_service:latest
     container_name: graph_service
     restart: unless-stopped
-    ports:
+    expose:
       - "${PORT_GRAPH_SERVICE}"
     command: ["--port", "${PORT_GRAPH_SERVICE}"]
     networks:
@@ -45,11 +45,29 @@ services:
     image: frontend:latest
     container_name: frontend
     restart: unless-stopped
-    ports:
-      - "${PORT_BFF}:${PORT_BFF}"
+    expose:
+      - "${PORT_BFF}"
     command: []
     networks:
       - services
+
+  caddy:
+    image: caddy:2
+    container_name: caddy
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy_data:/data
+      - caddy_config:/config
+    networks:
+      - services
+
+volumes:
+  caddy_data:
+  caddy_config:
 
 networks:
   services:
