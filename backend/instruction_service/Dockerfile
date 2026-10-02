@@ -9,8 +9,8 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     git \
     ca-certificates \
     pkg-config \
-    llvm-19-dev \
-    libclang-19-dev \
+    llvm-20-dev \
+    libclang-20-dev \
     libzstd-dev \
     libssl-dev \
     libjsoncpp-dev \
@@ -58,7 +58,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     libc-ares2 \
     libbrotli1 \
     libzstd1 \
-    libllvm19 \
+    libllvm20 \
     && rm -rf /var/lib/apt/lists/*
 
 COPY --from=builder /usr/local/lib/libdrogon*.so* /usr/local/lib/
