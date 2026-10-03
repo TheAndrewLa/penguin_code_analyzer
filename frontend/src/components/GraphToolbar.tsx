@@ -31,7 +31,7 @@ export const GraphToolbar: React.FC<GraphToolbarProps> = ({
             <div className="flex items-center gap-2">
                 {graphLoaded && (
                     <div className="flex gap-2">
-                        <span className="text-base font-medium text-gray-900">Select function</span>
+                        <span className="content-center text-base font-medium text-gray-900">Select function</span>
                         <SelectField
                             value={selectedFunction}
                             onChange={onFunctionChange}

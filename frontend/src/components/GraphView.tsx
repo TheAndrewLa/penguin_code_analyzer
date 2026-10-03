@@ -765,7 +765,7 @@ export const GraphView: React.FC<GraphViewProps> = ({
                 ))}
             </div>
 
-            <div className="absolute z-20 top-4 text-xs text-gray-500">
+            <div className="absolute z-20 top-4 right-4 text-xs text-gray-500">
                 Select basic block to simulate
             </div>
 
