@@ -765,6 +765,10 @@ export const GraphView: React.FC<GraphViewProps> = ({
                 ))}
             </div>
 
+            <div className="absolute z-20 top-4 text-xs text-gray-500">
+                Select basic block to simulate
+            </div>
+
             <div className="absolute z-20 bottom-4 right-4 flex items-center gap-1 bg-white border border-gray-400 rounded-lg p-2 shadow-md">
                 <button
                     className="btn btn-ghost btn-sm btn-square"

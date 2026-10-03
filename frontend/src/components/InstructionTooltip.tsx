@@ -16,7 +16,7 @@ const InstructionTooltip: React.FC<InstructionTooltipProps> = ({ metrics, x, y }
             <div>Throughput: {metrics.rThroughput}</div>
             <div>uOps: {metrics.uOps}</div>
             <div className="text-xs text-neutral/60 mt-1">
-                Ctrl+Click — Intel manual
+                Ctrl+Click — More info
             </div>
         </div>
     );
