@@ -46,8 +46,8 @@ interface SimulateResult {
 }
 
 const DEFAULT_C_CONTENT = `int fib(int n) {
-    int prev = 1, current = 1;
-    for (; n >= 0; --n) {
+    int prev = 0, current = 1;
+    for (; n > 0; --n) {
         int tmp = prev + current;
         prev = current;
         current = tmp;
