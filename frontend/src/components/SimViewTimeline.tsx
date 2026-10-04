@@ -24,6 +24,15 @@ interface TimelineViewProps {
     instructions: string[];
 }
 
+const LEGEND_ITEMS = [
+    { symbol: "D", label: "Dispatch", swatch: "bg-fuchsia-300" },
+    { symbol: "=", label: "Waiting to execute", swatch: "bg-orange-200" },
+    { symbol: "e", label: "Execute", swatch: "bg-emerald-200" },
+    { symbol: "E", label: "Execute finished", swatch: "bg-emerald-400" },
+    { symbol: "-", label: "Waiting to retire", swatch: "bg-yellow-200" },
+    { symbol: "R", label: "Retirement", swatch: "bg-indigo-300" },
+];
+
 export const TimelineView: React.FC<TimelineViewProps> = ({
     entries,
     instructions,
@@ -34,6 +43,7 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
 
     const [scale, setScale] = useState(1);
     const [offset, setOffset] = useState({ x: 0, y: 0 });
+    const [legendVisible, setLegendVisible] = useState(true);
 
     const cycles = useMemo(() => {
         return entries.reduce((acc, entry) => {
@@ -205,6 +215,43 @@ export const TimelineView: React.FC<TimelineViewProps> = ({
                         </div>
                     ))}
                 </div>
+            </div>
+
+            <div className="absolute z-20 top-4 right-4 bg-white border border-gray-400 rounded-lg p-2 shadow-md">
+                {legendVisible ? (
+                    <>
+                        <div className="flex flex-col gap-1 text-sm">
+                            {LEGEND_ITEMS.map((item) => (
+                                <div
+                                    key={item.symbol}
+                                    className="flex items-center gap-2"
+                                >
+                                    <div
+                                        className={`flex items-center justify-center w-6 h-6 shrink-0 font-mono text-sm border border-black rounded-sm ${item.swatch}`}
+                                    >
+                                        {item.symbol}
+                                    </div>
+                                    <span className="whitespace-nowrap">
+                                        {item.label}
+                                    </span>
+                                </div>
+                            ))}
+                        </div>
+                        <button
+                            className="w-full mt-2 pt-2 border-t border-gray-300 text-sm hover:text-ember"
+                            onClick={() => setLegendVisible(false)}
+                        >
+                            Hide
+                        </button>
+                    </>
+                ) : (
+                    <button
+                        className="text-sm"
+                        onClick={() => setLegendVisible(true)}
+                    >
+                        Show legend
+                    </button>
+                )}
             </div>
 
             <div className="absolute z-20 bottom-4 right-4 flex items-center gap-1 bg-white border border-gray-400 rounded-lg p-2 shadow-md">
